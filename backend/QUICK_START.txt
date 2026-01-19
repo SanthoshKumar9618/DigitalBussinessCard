@@ -1,0 +1,45 @@
+========================================
+QUICK START GUIDE
+========================================
+
+FOR FIRST TIME SETUP:
+---------------------
+1. Double-click: setup.bat
+   (or run: .\setup.ps1 in PowerShell)
+
+2. Make sure you have a .env file with database credentials
+
+3. Double-click: run.bat
+   (or run: .\run.ps1 in PowerShell)
+
+THAT'S IT! Server will start at http://localhost:8000
+
+
+FOR SUBSEQUENT RUNS:
+--------------------
+Just double-click: run.bat
+(or run: .\run.ps1 in PowerShell)
+
+
+IF YOU GET ERRORS:
+------------------
+1. ModuleNotFoundError?
+   -> Run setup.bat again
+
+2. Database connection error?
+   -> Check your .env file
+
+3. Port already in use?
+   -> Change port in run.bat or kill process on port 8000
+
+4. PowerShell execution policy error?
+   -> Run: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+
+MANUAL COMMAND (if scripts don't work):
+---------------------------------------
+venv\Scripts\activate
+uvicorn app.main:app --reload
+
+========================================
+
