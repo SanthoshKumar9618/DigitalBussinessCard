@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "scheme": "smartcard",
+
+    "android": {
+      "package": "com.anonymous.smartcardapp",
+      "permissions": [
+        "android.permission.NFC",
+        "android.permission.CAMERA"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "https",
+              "host": "yourapp.com",
+              "pathPrefix": "/open"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
+    },
+
+    "ios": {
+      "usesAppleSignIn": true,
+      "bundleIdentifier": "com.anonymous.smartcardapp"
+    },
+
+    "plugins": [
+      "expo-camera",
+      "expo-image-picker",
+      "expo-web-browser"
+    ]
+  }
+}
