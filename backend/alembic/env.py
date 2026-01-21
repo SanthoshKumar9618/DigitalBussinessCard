@@ -6,11 +6,15 @@ from alembic import context
 from app.config.settings import settings
 from app.database.models import Base  # import your SQLAlchemy Base
 
+
+from app.config.settings import settings
+
+
 # Alembic Config object
 config = context.config
 
 # Set SQLAlchemy URL dynamically from Pydantic settings
-config.set_main_option("sqlalchemy.url", settings.POSTGRES_DSN.replace('%', '%%'))
+config.set_main_option("sqlalchemy.url", str(settings.DATABASE_URL))
 
 # Set up Python logging from Alembic config file
 if config.config_file_name is not None:

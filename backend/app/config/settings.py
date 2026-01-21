@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import AnyUrl, AnyHttpUrl, field_validator
 from typing import List, Optional
 from datetime import timedelta
@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     REDIS_URL: Optional[str] = None
     SENTRY_DSN: Optional[str] = None
     APP_DOMAIN: str = "https://yourapp.com"
+    
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",   # <<< ADD THIS LINE
+    )
 
 
     @property
@@ -41,9 +47,6 @@ class Settings(BaseSettings):
     def jwt_refresh_expire(self) -> timedelta:
         return timedelta(days=self.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
     
-    class Config:
-       env_file = ".env"
-       env_file_encoding = "utf-8"
 
 
 settings = Settings()
