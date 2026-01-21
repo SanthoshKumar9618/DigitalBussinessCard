@@ -15,7 +15,7 @@ from app.routes import user
 
 # Create tables (only for safety if Alembic not applied yet — optional)
 # Alembic is the main migrations manager
-Base.metadata.create_all(bind=engine)
+#Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Smart Contact API",
