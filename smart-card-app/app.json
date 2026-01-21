@@ -1,12 +1,12 @@
 {
   "expo": {
     "scheme": "smartcard",
-
     "android": {
       "package": "com.anonymous.smartcardapp",
       "permissions": [
         "android.permission.NFC",
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ],
       "intentFilters": [
         {
@@ -18,20 +18,26 @@
               "pathPrefix": "/open"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
-
     "ios": {
       "usesAppleSignIn": true,
       "bundleIdentifier": "com.anonymous.smartcardapp"
     },
-
     "plugins": [
       "expo-camera",
       "expo-image-picker",
       "expo-web-browser"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "463dffd6-3dac-4995-bb32-2a770048bf66"
+      }
+    }
   }
 }

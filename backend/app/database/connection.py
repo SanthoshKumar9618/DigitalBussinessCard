@@ -4,9 +4,10 @@ from typing import Generator
 from app.config.settings import settings
 
 engine = create_engine(
-    settings.POSTGRES_DSN,
+    settings.DATABASE_URL,
     pool_pre_ping=True,
 )
+
 
 SessionLocal = scoped_session(
     sessionmaker(autocommit=False, autoflush=False, bind=engine)

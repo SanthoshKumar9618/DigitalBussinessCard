@@ -8,21 +8,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Digital Business Card API"
     ENVIRONMENT: str = "development"
 
-    API_V1_STR: str = "/api/v1"
-    SERVER_HOST: str = "0.0.0.0"
-    SERVER_PORT: int = 8000
-
-    BACKEND_CORS_ORIGINS: list[str] = ["*"]
-
-    FRONTEND_URL: Optional[AnyHttpUrl] = None
-
-    POSTGRES_USER: str
-    POSTGRES_PASSWORD: str
-    POSTGRES_HOST: str
-    POSTGRES_PORT: str
-    POSTGRES_DB: str
-    POSTGRES_DSN: str
-    DATABASE_URL: Optional[AnyUrl] = None
+    DATABASE_URL: AnyUrl
 
     smtp_email: str
     smtp_password: str
