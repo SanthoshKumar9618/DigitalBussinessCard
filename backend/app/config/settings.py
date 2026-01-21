@@ -32,17 +32,6 @@ class Settings(BaseSettings):
     SENTRY_DSN: Optional[str] = None
     APP_DOMAIN: str = "https://yourapp.com"
 
-    
-
-    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
-    def parse_cors_origins(cls, v):
-        if isinstance(v, str):
-            v = v.strip()
-            if v.startswith("[") and v.endswith("]"):
-                import json
-                return json.loads(v)
-            return [i.strip() for i in v.split(",") if i.strip()]
-        return v
 
     @property
     def jwt_access_expire(self) -> timedelta:
