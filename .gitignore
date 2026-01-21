@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+.env
+
+# Node / Expo
+node_modules/
+.expo/
+dist/
+build/
+
+# OS
+.DS_Store
