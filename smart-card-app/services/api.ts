@@ -2,18 +2,11 @@ import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
-const API_PORT = "8000";
-const USING_PHYSICAL_DEVICE = true; 
-const MY_LAPTOP_IP = "192.168.68.113";
-
-export const BASE_URL = Platform.select({
-  android: `http://${MY_LAPTOP_IP}:${API_PORT}`,
-  ios: `http://localhost:${API_PORT}`,
-  default: `http://${MY_LAPTOP_IP}:${API_PORT}`,
-});
+export const BASE_URL = "https://digitalbussinesscard-backend.onrender.com";
 
 const api = axios.create({
   baseURL: BASE_URL,
+  timeout: 15000,
 });
 
 api.interceptors.request.use(async (config) => {
