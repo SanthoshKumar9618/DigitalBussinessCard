@@ -9,8 +9,30 @@ router = APIRouter(prefix="/profile", tags=["Profile"])
 
 
 @router.post("/", response_model=ProfileOut, status_code=status.HTTP_201_CREATED)
-async def create_profile(payload: ProfileCreate, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-    return await profile_service.create_profile(db, current_user.id, payload)
+async def create_profile(
+    payload: ProfileCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    profile = await profile_service.create_profile(db, current_user.id, payload)
+
+    return ProfileOut(
+        id=str(profile.id),
+        slug=profile.slug,
+        avatar_url=profile.avatar_url,
+        display_name=profile.display_name,
+        job_title=profile.job_title,
+        company=profile.company,
+        bio=profile.bio,
+        website=profile.website,
+        linkedin=profile.linkedin,
+        twitter=profile.twitter,
+        facebook=profile.facebook,
+        whatsapp=profile.whatsapp,
+        email=current_user.email,   # REQUIRED
+        phone=current_user.phone,   # REQUIRED
+    )
+
 
 
 @router.get("/me", response_model=ProfileOut)
