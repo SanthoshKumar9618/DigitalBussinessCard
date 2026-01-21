@@ -32,16 +32,7 @@ class Settings(BaseSettings):
     SENTRY_DSN: Optional[str] = None
     APP_DOMAIN: str = "https://yourapp.com"
 
-    @field_validator("POSTGRES_DSN", mode="before")
-    def assemble_postgres_dsn(cls, v, info):
-        if v:
-            return str(v)
-        user = info.data.get("POSTGRES_USER")
-        password = info.data.get("POSTGRES_PASSWORD")
-        host = info.data.get("POSTGRES_HOST")
-        port = info.data.get("POSTGRES_PORT")
-        db = info.data.get("POSTGRES_DB")
-        return f"postgresql://{user}:{password}@{host}:{port}/{db}"
+    
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     def parse_cors_origins(cls, v):
