@@ -28,7 +28,10 @@ async def register(payload: UserCreate, db: Session = Depends(get_db)):
         existing_email.email_otp = hash_otp(otp)
         existing_email.otp_expires_at = otp_expiry_time()
         db.commit()
-        send_otp_email(existing_email.email, otp)
+        try:
+           send_otp_email(existing_email.email, otp)
+        except Exception as e:
+           print("OTP send failed:", e)
 
         return {
             "message": "OTP resent to email",
@@ -47,7 +50,11 @@ async def register(payload: UserCreate, db: Session = Depends(get_db)):
     user.email_otp = hash_otp(otp)
     user.otp_expires_at = otp_expiry_time()
     db.commit()
-    send_otp_email(user.email, otp)
+    try:
+       send_otp_email(user.email, otp)
+    except Exception as e:
+       print("OTP send failed:", e)
+
 
     return {
         "message": "OTP sent to email",
@@ -195,6 +202,10 @@ def resend_email_otp(user_id: str, db: Session = Depends(get_db)):
 
     db.commit()
 
-    send_otp_email(user.email, otp)
+    try:
+       send_otp_email(user.email, otp)
+    except Exception as e:
+       print("OTP resend failed:", e)
+
 
     return {"message": "OTP resent to email"}
