@@ -1,13 +1,26 @@
 # Python
 __pycache__/
+*.py[cod]
+*.pyo
+*.pyd
 *.pyc
-.env
 
-# Node / Expo
-node_modules/
-.expo/
-dist/
-build/
+# Virtual environments
+venv/
+.env
+.env.*
+
+# Uploads (runtime data)
+backend/uploads/
 
 # OS
 .DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+.expo/
+dist/
+
+# Logs
+*.log
