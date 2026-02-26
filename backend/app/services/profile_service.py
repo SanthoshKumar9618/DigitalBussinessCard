@@ -1,3 +1,4 @@
+from app.services import user
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from app.database.models import Profile
@@ -5,24 +6,33 @@ from slugify import slugify
 from app.services.contact_service import get_all_owners_for_profile
 from app.utils.notification import send_email
 
-async def create_profile(db, user_id, payload):
-    existing = db.query(Profile).filter(Profile.user_id == user_id).first()
+async def create_profile(db: Session, user, payload):
+    # 1. Check if profile already exists
+    existing = (
+        db.query(Profile)
+        .filter(Profile.user_id == user.id)
+        .first()
+    )
     if existing:
-        raise HTTPException(status_code=400, detail="Profile already exists")
+        raise HTTPException(
+            status_code=400,
+            detail="Profile already exists"
+        )
 
-    base_slug = slugify(payload.display_name)
+    # 2. Generate unique slug
+    base_slug = slugify(user.name)
     slug = base_slug
-
-    # Ensure slug unique
     counter = 1
+
     while db.query(Profile).filter(Profile.slug == slug).first():
         slug = f"{base_slug}-{counter}"
         counter += 1
 
+    # 3. Create profile
     profile = Profile(
-        user_id=user_id,
+        user_id=user.id,
         slug=slug,
-        display_name=payload.display_name,
+        display_name=user.name,
         job_title=payload.job_title,
         company=payload.company,
         bio=payload.bio,
@@ -33,23 +43,27 @@ async def create_profile(db, user_id, payload):
         whatsapp=payload.whatsapp,
     )
 
+    # 4. Save to DB
     db.add(profile)
     db.commit()
     db.refresh(profile)
+
+    # 5. RETURN (THIS IS CRITICAL)
     return profile
 
 
 async def update_profile(db: Session, user_id: str, payload):
-    profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+    profile = (
+        db.query(Profile)
+        .filter(Profile.user_id == user_id)
+        .first()
+    )
+
     if not profile:
         return None
 
-    # Detect changed fields for notifications
     updated_fields = {}
-
-    # Convert HttpUrl to string if exists
-    if payload.display_name is not None and payload.display_name != profile.display_name:
-        updated_fields["Name"] = f"{profile.display_name} → {payload.display_name}"
+    if payload.display_name is not None:
         profile.display_name = payload.display_name
 
     if payload.job_title is not None and payload.job_title != profile.job_title:
@@ -89,29 +103,27 @@ async def update_profile(db: Session, user_id: str, payload):
     db.commit()
     db.refresh(profile)
 
-    # Notify contacts who saved this profile if something changed
+    # Notify contacts
     if updated_fields:
         try:
             owners = await get_all_owners_for_profile(db, str(profile.id))
             for record in owners:
-                try:
-                    message = "The contact you saved has updated information:\n\n"
-                    for k, v in updated_fields.items():
-                        message += f"- {k}: {v}\n"
+                message = "The contact you saved has updated information:\n\n"
+                for k, v in updated_fields.items():
+                    message += f"- {k}: {v}\n"
 
-                    message += f"\nView Profile: https://yourapp.com/u/{profile.slug}"
+                message += f"\nView Profile: https://yourapp.com/u/{profile.slug}"
 
-                    send_email(
-                        to=record.owner.email,
-                        subject="Contact Updated!",
-                        body=message
-                    )
-                except Exception as e:
-                    print(f"Email error for {record.owner.email}: {e}")
+                send_email(
+                    to=record.owner.email,
+                    subject="Contact Updated!",
+                    body=message,
+                )
         except Exception as e:
-            print(f"Error getting profile owners: {e}")
+            print("Notification error:", e)
 
     return profile
+
 
 
 async def get_profile_by_slug(db: Session, slug: str):

@@ -3,11 +3,15 @@ from sqlalchemy.orm import sessionmaker, scoped_session, declarative_base
 from typing import Generator
 from app.config.settings import settings
 
+# engine = create_engine(
+#     str(settings.DATABASE_URL),
+#     pool_pre_ping=True,
+# )
+
 engine = create_engine(
-    str(settings.DATABASE_URL),
+    settings.POSTGRES_DSN,
     pool_pre_ping=True,
 )
-
 
 
 SessionLocal = scoped_session(

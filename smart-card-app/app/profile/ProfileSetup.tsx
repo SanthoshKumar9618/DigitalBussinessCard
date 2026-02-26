@@ -9,7 +9,7 @@ import {
   ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import * as ImagePicker from "expo-image-picker";
 import { createProfile } from "../../services/profileService";
 import api from "../../services/api";
@@ -21,7 +21,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 
 type ProfileForm = {
-  display_name: string;
   job_title?: string;
   company?: string;
   bio?: string;
@@ -36,9 +35,9 @@ export default function ProfileSetup() {
   const { colors } = useApp();
   const [saving, setSaving] = useState(false);
   const [avatar, setAvatar] = useState<string | null>(null);
+  const [fullName, setFullName] = useState("");
 
   const [form, setForm] = useState<ProfileForm>({
-    display_name: "",
     job_title: "",
     company: "",
     bio: "",
@@ -79,10 +78,6 @@ export default function ProfileSetup() {
   const handleSave = async () => {
   if (saving) return;
 
-  if (!form.display_name.trim()) {
-    Alert.alert("Name required", "Please enter your full name.");
-    return;
-  }
 
   setSaving(true);
 
@@ -125,6 +120,16 @@ const handleSkip = async () => {
   await AsyncStorage.setItem("profile_setup_done", "true");
   router.replace("/(tabs)/network");
 };
+useEffect(() => {
+  api.get("/profile/me")
+   .then(res => {
+  setFullName(res.data.display_name);
+})
+.catch(err => {
+  console.log("PROFILE ME ERROR", err.response?.status);
+});
+
+}, []);
 
 
 
@@ -161,10 +166,34 @@ const handleSkip = async () => {
           <Text style={[styles.subtitle, { color: colors.subText }]}>
             This information will be visible to others.
           </Text>
+          <View style={styles.fieldGroup}>
+  <Text style={[styles.label, { color: colors.subText }]}>
+    Name
+  </Text>
+
+  <View
+    style={[
+      styles.input,
+      {
+        backgroundColor: colors.card,
+        borderColor: colors.border,
+        opacity: 0.6,
+        justifyContent: "space-between",
+        flexDirection: "row",
+        alignItems: "center",
+      },
+    ]} >
+       
+  </View>
+
+  <Text style={{ fontSize: 12, color: colors.subText, marginTop: 4 }}>
+    You can change your name from Edit Profile
+  </Text>
+</View>
+
 
           {/* Inputs */}
           {[
-            { key: "display_name", label: "Full Name" },
             { key: "job_title", label: "Job Title" },
             { key: "company", label: "Company" },
             { key: "bio", label: "Bio", multiline: true },

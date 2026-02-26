@@ -5,6 +5,9 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { useState } from "react";
@@ -51,8 +54,16 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.card}>
+    <KeyboardAvoidingView
+         style={{ flex: 1 }}
+         behavior={Platform.OS === "ios" ? "padding" : "height"}
+       >
+         <ScrollView
+           contentContainerStyle={styles.container}
+           keyboardShouldPersistTaps="handled"
+           showsVerticalScrollIndicator={false}
+         >
+           <View style={styles.card}>
         <Text style={styles.title}>Reset Password</Text>
         <Text style={styles.subtitle}>
           Enter OTP and set a new password.
@@ -122,7 +133,8 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
           </Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

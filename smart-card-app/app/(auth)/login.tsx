@@ -1,4 +1,4 @@
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, ScrollView,Platform  } from "react-native";
 import { useState, useEffect } from "react";
 import { useRouter } from "expo-router";
 import api from "@/services/api";
@@ -121,8 +121,17 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.card}>
+   <KeyboardAvoidingView
+     style={{ flex: 1 }}
+     behavior={Platform.OS === "ios" ? "padding" : "height"}
+   >
+     <ScrollView
+       contentContainerStyle={styles.container}
+       keyboardShouldPersistTaps="handled"
+       showsVerticalScrollIndicator={false}
+     >
+       <View style={styles.card}>
+   
 
         <Text style={styles.title}>Welcome Back</Text>
         <Text style={styles.subtitle}>Sign in to access your network</Text>
@@ -210,7 +219,8 @@ export default function LoginScreen() {
         </Text>
 
       </View>
-    </View>
+    </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

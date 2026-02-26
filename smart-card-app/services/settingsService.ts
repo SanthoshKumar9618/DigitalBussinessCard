@@ -22,6 +22,6 @@ export const updateSettings = async (
     language: string;
   }>
 ) => {
-  const res = await api.put("/settings", payload);
+  const res = await api.put("/settings/", payload);
   return res.data;
 };

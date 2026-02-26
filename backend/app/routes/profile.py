@@ -1,3 +1,4 @@
+from app.database.models import Profile
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database.connection import get_db
@@ -14,37 +15,12 @@ async def create_profile(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    profile = await profile_service.create_profile(db, current_user.id, payload)
-
-    return ProfileOut(
-        id=str(profile.id),
-        slug=profile.slug,
-        avatar_url=profile.avatar_url,
-        display_name=profile.display_name,
-        job_title=profile.job_title,
-        company=profile.company,
-        bio=profile.bio,
-        website=profile.website,
-        linkedin=profile.linkedin,
-        twitter=profile.twitter,
-        facebook=profile.facebook,
-        whatsapp=profile.whatsapp,
-        email=current_user.email,   # REQUIRED
-        phone=current_user.phone,   # REQUIRED
+    profile = await profile_service.create_profile(
+        db=db,
+        user=current_user,
+        payload=payload,
     )
 
-
-
-@router.get("/me", response_model=ProfileOut)
-async def get_my_profile(
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
-):
-    profile = await profile_service.get_profile_by_user(db, current_user.id)
-    if not profile:
-        raise HTTPException(status_code=404, detail="Profile not found")
-
-    # Build combined response
     return ProfileOut(
         id=str(profile.id),
         slug=profile.slug,
@@ -62,6 +38,51 @@ async def get_my_profile(
         phone=current_user.phone,
     )
 
+@router.get("/me")
+async def get_my_profile(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    profile = (
+        db.query(Profile)
+        .filter(Profile.user_id == current_user.id)
+        .first()
+    )
+
+    if not profile:
+        return {
+            "id": None,
+            "slug": None,
+            "avatar_url": None,
+            "display_name": current_user.name,
+            "job_title": None,
+            "company": None,
+            "bio": None,
+            "website": None,
+            "linkedin": None,
+            "twitter": None,
+            "facebook": None,
+            "whatsapp": None,
+            "email": current_user.email,
+            "phone": current_user.phone,
+        }
+
+    return {
+        "id": str(profile.id),
+        "slug": profile.slug,
+        "avatar_url": profile.avatar_url,
+        "display_name": profile.display_name,
+        "job_title": profile.job_title,
+        "company": profile.company,
+        "bio": profile.bio,
+        "website": profile.website,
+        "linkedin": profile.linkedin,
+        "twitter": profile.twitter,
+        "facebook": profile.facebook,
+        "whatsapp": profile.whatsapp,
+        "email": current_user.email,
+        "phone": current_user.phone,
+    }
 
 
 @router.put("/", response_model=ProfileOut)
@@ -70,7 +91,11 @@ async def update_profile(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    profile = await profile_service.update_profile(db, current_user.id, payload)
+    profile = await profile_service.update_profile(
+    db=db,
+    user_id=current_user.id,
+    payload=payload
+)
 
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")

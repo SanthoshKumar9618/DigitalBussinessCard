@@ -5,6 +5,9 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  KeyboardAvoidingView,
+  ScrollView,
+  Platform,
 } from "react-native";
 import { useState } from "react";
 import { router } from "expo-router";
@@ -41,8 +44,16 @@ export default function ForgotPasswordScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.card}>
+    <KeyboardAvoidingView
+         style={{ flex: 1 }}
+         behavior={Platform.OS === "ios" ? "padding" : "height"}
+       >
+         <ScrollView
+           contentContainerStyle={styles.container}
+           keyboardShouldPersistTaps="handled"
+           showsVerticalScrollIndicator={false}
+         >
+           <View style={styles.card}>
         <Text style={styles.title}>Forgot Password</Text>
         <Text style={styles.subtitle}>
           Enter your registered email to receive an OTP.
@@ -71,7 +82,8 @@ export default function ForgotPasswordScreen() {
           Back to login
         </Text>
       </View>
-    </View>
+    </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

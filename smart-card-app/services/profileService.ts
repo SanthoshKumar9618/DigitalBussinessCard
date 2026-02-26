@@ -12,7 +12,6 @@ export const getMyProfile = async () => {
  * CREATE profile (first time)
  */
 export type ProfileCreatePayload = {
-  display_name: string;
   job_title?: string;
   company?: string;
   bio?: string;
@@ -36,7 +35,6 @@ export const createProfile = async (payload: ProfileCreatePayload) => {
  * UPDATE profile
  */
 export type ProfileUpdatePayload = {
-  display_name?: string;
   job_title?: string;
   company?: string;
   bio?: string;

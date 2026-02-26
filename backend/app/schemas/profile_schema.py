@@ -4,7 +4,7 @@ from uuid import UUID
 
 
 class ProfileBase(BaseModel):
-    display_name: str = Field(..., max_length=255)
+    display_name: Optional[str] = None   
     job_title: Optional[str] = Field(None, max_length=255)
     company: Optional[str] = Field(None, max_length=255)
     bio: Optional[str] = Field(None, max_length=600)
@@ -16,7 +16,6 @@ class ProfileBase(BaseModel):
 
 
 class ProfileCreate(BaseModel):
-    display_name: str = Field(..., max_length=255)
     job_title: Optional[str] = None
     company: Optional[str] = None
     bio: Optional[str] = None
@@ -29,7 +28,7 @@ class ProfileCreate(BaseModel):
 
 
 class ProfileUpdate(BaseModel):
-    display_name: Optional[str] = None
+    display_name: Optional[str] = None 
     job_title: Optional[str] = None
     company: Optional[str] = None
     bio: Optional[str] = None
@@ -54,7 +53,7 @@ class ProfileOut(ProfileBase):
 
 class PublicProfileOut(BaseModel):
     id: UUID          # ⭐ THIS IS THE KEY FIX
-    display_name: str
+    display_name: Optional[str] = None
     slug: str
     job_title: Optional[str]
     company: Optional[str]

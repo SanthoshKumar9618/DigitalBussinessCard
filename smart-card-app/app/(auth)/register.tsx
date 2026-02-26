@@ -1,4 +1,4 @@
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, ScrollView,Platform } from "react-native";
 import { useState } from "react";
 import { registerUser } from "../../services/authService";
 import { router } from "expo-router";
@@ -53,8 +53,17 @@ router.replace("/");
 };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.card}>
+    <KeyboardAvoidingView
+  style={{ flex: 1 }}
+  behavior={Platform.OS === "ios" ? "padding" : "height"}
+>
+  <ScrollView
+    contentContainerStyle={styles.container}
+    keyboardShouldPersistTaps="handled"
+    showsVerticalScrollIndicator={false}
+  >
+    <View style={styles.card}>
+
         <Text style={styles.title}>Create Account</Text>
         <Text style={styles.subtitle}>Your digital business card</Text>
 
@@ -133,7 +142,9 @@ router.replace("/");
           Already have an account?
         </Text>
       </View>
-    </View>
+    
+  </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
