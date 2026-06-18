@@ -3,24 +3,27 @@ __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
-*.pyc
 
-# Virtual environments
+# Virtual Environment
+.venv/
+.venv311/
 venv/
+env/
+
+# Environment Variables
 .env
 .env.*
 
-# Uploads (runtime data)
-backend/uploads/
+# IDE
+.vscode/
+.idea/
+
+# Python cache
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
 
 # OS
 .DS_Store
 Thumbs.db
-
-# Node
-node_modules/
-.expo/
-dist/
-
-# Logs
-*.log
