@@ -1,16 +1,15 @@
 # Python
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
 
-# Virtual Environment
-.venv/
-.venv311/
+# Virtual environments
 venv/
-env/
+.venv/
+backend/venv/
+backend/.venv/
+backend/.venv311/
 
-# Environment Variables
+# Environment
 .env
 .env.*
 
@@ -18,12 +17,8 @@ env/
 .vscode/
 .idea/
 
-# Python cache
+# pytest
 .pytest_cache/
-.mypy_cache/
-.coverage
-htmlcov/
 
-# OS
-.DS_Store
-Thumbs.db
+# mypy
+.mypy_cache/
