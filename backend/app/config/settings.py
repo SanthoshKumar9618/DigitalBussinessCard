@@ -62,13 +62,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    postgres_dsn: PostgresDsn
-    
-    POSTGRES_DSN: str
-     # ---------------- JWT ----------------
+
+    # ---------------- DATABASE ----------------
+    POSTGRES_DSN: PostgresDsn
+
+    # ---------------- JWT ----------------
     JWT_SECRET: str
     JWT_ALGORITHM: str = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
     # ---------------- APP ----------------
@@ -88,7 +89,7 @@ class Settings(BaseSettings):
 
     @property
     def DATABASE_URL(self) -> PostgresDsn:
-        return self.postgres_dsn
+        return self.POSTGRES_DSN
 
 
 settings = Settings()
