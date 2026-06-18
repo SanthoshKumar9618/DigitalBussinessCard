@@ -9,6 +9,10 @@ backend/venv/
 backend/.venv/
 backend/.venv311/
 
+
+# User uploads
+backend/uploads/
+
 # Environment
 .env
 .env.*
