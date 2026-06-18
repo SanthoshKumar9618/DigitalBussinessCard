@@ -9,7 +9,7 @@ from app.config.settings import settings
 # )
 
 engine = create_engine(
-    settings.POSTGRES_DSN,
+    str(settings.POSTGRES_DSN),
     pool_pre_ping=True,
 )
 
