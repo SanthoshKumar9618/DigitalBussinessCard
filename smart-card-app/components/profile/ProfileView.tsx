@@ -44,8 +44,21 @@ export default function ProfileView({ profile, onRefresh }: any) {
     colors,
   } = useApp();
 
-  if (!settings) return null;
-
+if (!settings) {
+  return (
+    <SafeScreen>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <Text>Loading Settings...</Text>
+      </View>
+    </SafeScreen>
+  );
+}
   /* ---------------- EFFECTS ---------------- */
 
   useEffect(() => {
@@ -342,8 +355,6 @@ export default function ProfileView({ profile, onRefresh }: any) {
     </View>
   </>
 )}
-
-
           {/* QR */}
           <View
             style={[

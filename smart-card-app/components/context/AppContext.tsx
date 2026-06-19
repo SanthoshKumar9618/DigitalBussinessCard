@@ -69,19 +69,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
 
   const refreshSettings = async () => {
+  console.log("========== SETTINGS ==========");
+
+  try {
+    const data = await getSettings();
+
+    console.log("SETTINGS RESPONSE =", JSON.stringify(data, null, 2));
+
+    setSettings(data);
+
+    console.log("SETTINGS SAVED");
+  } catch (e: any) {
+    console.log("SETTINGS ERROR STATUS =", e.response?.status);
+    console.log("SETTINGS ERROR BODY =", e.response?.data);
+    console.log("SETTINGS ERROR =", e.message);
+  } finally {
+    console.log("SETTINGS LOADING FINISHED");
+    setLoading(false);
+  }
+};
+
+  useEffect(() => {
+  const load = async () => {
     try {
-      const data = await getSettings();
-      setSettings(data);
-    } catch {
-      console.log("Failed to load settings");
-    } finally {
-      setLoading(false);
+      await refreshSettings();
+    } catch (e) {
+      console.log("Settings not available yet");
     }
   };
 
-  useEffect(() => {
-    refreshSettings();
-  }, []);
+  load();
+}, []);
 
   const updateSetting = async (key: keyof AppSettings, value: any) => {
     if (!settings) return;

@@ -56,15 +56,42 @@ def add_contact(db: Session, owner_id: str, payload):
 # -----------------------------
 # LIST CONTACTS (AUTO DISPLAY FIX)
 # -----------------------------
+
+
+
 def list_contacts(db: Session, owner_id: str, skip=0, limit=50):
-    return (
+    contacts = (
         db.query(Contact)
+        .options(
+            joinedload(Contact.target_profile)
+            .joinedload(Profile.user)
+        )
         .filter(Contact.owner_id == owner_id)
         .order_by(Contact.created_at.desc())
         .offset(skip)
         .limit(limit)
         .all()
     )
+
+    # Update snapshot fields with latest profile data
+    for contact in contacts:
+        profile = contact.target_profile
+
+        if profile:
+            contact.saved_display_name = profile.display_name
+            contact.saved_company = profile.company
+            contact.saved_job_title = profile.job_title
+            contact.saved_website = profile.website
+            contact.saved_whatsapp = profile.whatsapp
+            contact.avatar_url = profile.avatar_url
+
+            if profile.user:
+                contact.saved_phone = profile.user.phone
+                contact.saved_email = profile.user.email
+
+    db.commit()
+
+    return contacts
 
 
 # -----------------------------

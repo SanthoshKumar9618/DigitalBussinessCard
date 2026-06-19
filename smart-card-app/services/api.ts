@@ -42,39 +42,38 @@
 
 // export default api;
 
-
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import { Platform } from "react-native";
-const API_PORT = "8000";
-const USING_PHYSICAL_DEVICE = true; 
-const MY_LAPTOP_IP = "10.49.229.15";
-
-export const BASE_URL = Platform.select({
-  android: `http://${MY_LAPTOP_IP}:${API_PORT}`,
-  ios: `http://localhost:${API_PORT}`,
-  default: `http://${MY_LAPTOP_IP}:${API_PORT}`,
-});
+export const BASE_URL =
+  "https://digitalbussinesscard-backend.onrender.com";
 
 const api = axios.create({
   baseURL: BASE_URL,
+  timeout: 30000,
 });
 
 api.interceptors.request.use(async (config) => {
   const token = await AsyncStorage.getItem("access_token");
+
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  config.headers["Content-Type"] = "application/json";
+
   return config;
 });
 
 api.interceptors.response.use(
-  (res) => res,
+  (response) => response,
   async (error) => {
     if (error.response?.status === 401) {
       await AsyncStorage.removeItem("access_token");
     }
+
+    console.log("API ERROR:", error.response?.data || error.message);
+
     return Promise.reject(error);
   }
 );
