@@ -7,7 +7,7 @@ import os
 from app.routes import (
     auth, profile, public_profile, contacts,
     categories, nfc_qr, profile_card as profile_card_router,
-    auth_social, profile_avatar, settings as settings_router, user, leads, profile_links
+    auth_social, profile_avatar, settings as settings_router, user, leads, profile_links, cards
 )
 from app.database.connection import Base
 from app.config.settings import settings
@@ -48,6 +48,7 @@ app.include_router(auth_social.router)
 app.include_router(user.router)
 app.include_router(leads.router)
 app.include_router(profile_links.router)
+app.include_router(cards.router)
 
 @app.get("/")
 def root():

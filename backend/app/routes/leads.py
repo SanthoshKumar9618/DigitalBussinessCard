@@ -8,7 +8,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
-from app.database.models import Lead
+from app.database.models import Lead, Profile
+from app.services.cards import require_active_card
 from app.services import analytics_service
 from app.utils.exporters import build_csv
 from app.utils.jwt_handler import get_current_user
@@ -26,6 +27,8 @@ class LeadOut(BaseModel):
     source: Optional[str] = None
     is_read: bool
     created_at: datetime
+    card_id: Optional[UUID] = None
+    card_label: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -35,14 +38,19 @@ class LeadUpdate(BaseModel):
     is_read: bool
 
 
-def _profile_id(user):
-    if not user.profile:
-        raise HTTPException(status_code=404, detail="Create your profile first")
-    return user.profile.id
+def _card_ids(user) -> list:
+    return [p.id for p in user.profiles]
+
+
+def _out(lead: Lead) -> dict:
+    data = LeadOut.model_validate(lead).model_dump()
+    data["card_id"] = lead.profile_id
+    data["card_label"] = lead.profile.label if lead.profile else None
+    return data
 
 
 def _get_lead(db: Session, user, lead_id: UUID) -> Lead:
-    lead = db.query(Lead).filter(Lead.id == lead_id, Lead.profile_id == _profile_id(user)).first()
+    lead = db.query(Lead).filter(Lead.id == lead_id, Lead.profile_id.in_(_card_ids(user))).first()
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
     return lead
@@ -56,26 +64,29 @@ def list_leads(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    if not user.profile:
+    """One inbox for all of the user's cards; each lead says which card it came from."""
+    ids = _card_ids(user)
+    if not ids:
         return []
-    return (
+    leads = (
         db.query(Lead)
-        .filter(Lead.profile_id == user.profile.id)
+        .filter(Lead.profile_id.in_(ids))
         .order_by(Lead.created_at.desc())
         .offset(skip)
         .limit(limit)
         .all()
     )
+    return [_out(l) for l in leads]
 
 
 @router.get("/leads/export.csv")
 def export_leads(db: Session = Depends(get_db), user=Depends(get_current_user)):
-    leads = []
-    if user.profile:
-        leads = db.query(Lead).filter(Lead.profile_id == user.profile.id).order_by(Lead.created_at.desc()).all()
+    ids = _card_ids(user)
+    leads = db.query(Lead).filter(Lead.profile_id.in_(ids)).order_by(Lead.created_at.desc()).all() if ids else []
     csv_text = build_csv(
-        ["Name", "Email", "Phone", "Company", "Note", "Source", "Received"],
-        [[l.name, l.email, l.phone, l.company, l.note, l.source, l.created_at.isoformat() if l.created_at else ""] for l in leads],
+        ["Name", "Email", "Phone", "Company", "Note", "Card", "Source", "Received"],
+        [[l.name, l.email, l.phone, l.company, l.note, l.profile.label if l.profile else "", l.source,
+          l.created_at.isoformat() if l.created_at else ""] for l in leads],
     )
     return Response(csv_text, media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": 'attachment; filename="leads.csv"'})
@@ -87,7 +98,7 @@ def update_lead(lead_id: UUID, payload: LeadUpdate, db: Session = Depends(get_db
     lead.is_read = payload.is_read
     db.commit()
     db.refresh(lead)
-    return lead
+    return _out(lead)
 
 
 @router.delete("/leads/{lead_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -102,6 +113,7 @@ def delete_lead(lead_id: UUID, db: Session = Depends(get_db), user=Depends(get_c
 def analytics_summary(
     days: int = Query(7, ge=1, le=90),
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    card: Profile = Depends(require_active_card),
 ):
-    return analytics_service.summary(db, _profile_id(user), days)
+    """Insights for the active card (X-Card-Id header, default: primary)."""
+    return {**analytics_service.summary(db, card.id, days), "card_id": str(card.id), "card_label": card.label}

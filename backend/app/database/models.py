@@ -14,6 +14,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
@@ -56,12 +57,18 @@ class User(Base):
         nullable=False,
     )
 
-    profile = relationship(
+    # A user can have several cards (work, personal…). Exactly one is primary.
+    profiles = relationship(
         "Profile",
-        uselist=False,
         back_populates="user",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
+        order_by=lambda: [Profile.is_primary.desc(), Profile.created_at],
     )
+
+    @property
+    def profile(self):
+        """The primary card (or None). Kept for code that predates multiple cards."""
+        return self.profiles[0] if self.profiles else None
 
     def __repr__(self):
         return f"<User {self.email}>"
@@ -73,6 +80,10 @@ class Profile(Base):
     __table_args__ = (
         UniqueConstraint("slug", name="uq_profiles_slug"),
         Index("ix_profiles_user_id", "user_id"),
+        Index(
+            "uq_profiles_one_primary_per_user", "user_id", unique=True,
+            postgresql_where=text("is_primary"), sqlite_where=text("is_primary"),
+        ),
     )
 
     id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -91,7 +102,14 @@ class Profile(Base):
     whatsapp = Column(String(length=64), nullable=True)
 
     user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    user = relationship("User", back_populates="profile")
+    user = relationship("User", back_populates="profiles")
+
+    # Multiple cards per user
+    label = Column(String(length=50), nullable=False, default="Main", server_default="Main")
+    is_primary = Column(Boolean, nullable=False, default=False, server_default="false")
+    # Optional per-card contact details (e.g. a work email); fall back to the account's
+    contact_email = Column(String(length=255), nullable=True)
+    contact_phone = Column(String(length=50), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(

@@ -63,7 +63,7 @@ The goal is that every scan turns into either a saved contact or a captured lead
 | 1.7 | **Export contacts and leads as CSV** | Move data into any CRM today |
 | 1.8 | **Design tokens** + Network screen redesign | Consistent and light-mode safe |
 
-### Phase 2: Reach (built, except multiple cards)
+### Phase 2: Reach (built)
 
 | # | Feature | Status |
 |---|---|---|
@@ -72,7 +72,7 @@ The goal is that every scan turns into either a saved contact or a captured lead
 | 2.3 | **Custom links** (up to 20: portfolio, booking, payment) with reordering, shown on the card | ✅ |
 | 2.4 | **Email signature generator**: email-safe HTML with avatar, contacts and a QR code, one-tap copy, how-to for Gmail/Outlook/Apple Mail. Views are tracked as source `email`. | ✅ |
 | 2.5 | **Apple Wallet (.pkpass) and Google Wallet** passes with your QR. Buttons appear on the card and in the Share kit only when configured. | ✅ Needs Apple/Google credentials |
-| 2.6 | **Multiple cards per user** (work / personal) | ⏳ Phase 2b: every endpoint assumes one profile per user, so this needs its own migration and testing |
+| 2.6 | **Multiple cards per user** (Work / Personal / …, up to 5). Each card has its own link, QR code, links, design, stats and optional email/phone. One leads inbox across all cards. | ✅ Phase 2b |
 
 **Turning on the parts that need credentials**
 
@@ -234,6 +234,30 @@ Where views came from: QR 60% · NFC 25% · Link 15%
 | GET | `/public/{slug}/wallet/apple` · `/wallet/google` | — | Wallet passes (503 until configured) |
 
 Run `alembic upgrade head` again: migration `b7e2d4f1c8a3` adds `profile_links` and `slug_aliases`.
+
+**Phase 2b: multiple cards**
+
+The app sends `X-Card-Id: <card id>` to say which card a request is about. Without the header the **primary** card is used, so older app versions keep working unchanged.
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/cards` | List your cards (primary first) |
+| POST | `/cards` `{label, copy_from?, blank?}` | New card, copied from another card by default (max 5) |
+| PATCH | `/cards/{id}` `{label?, contact_email?, contact_phone?}` | Rename, or set the card's own email/phone (`""` clears) |
+| POST | `/cards/{id}/primary` | Make primary (exactly one; enforced by a unique index) |
+| DELETE | `/cards/{id}` | Delete a non-primary card (details below) |
+
+What deleting a card does:
+- Its link and old links **redirect to the primary card**.
+- Its NFC tags move to the primary card.
+- People who saved it keep you as a contact, now pointing at your primary card.
+- Its own links, design, leads and stats are deleted.
+
+Per-card endpoints (they follow `X-Card-Id`): `/profile/me`, `PUT /profile/`, `/profile/avatar`, `/profile-card/card`, `/profile/links*`, `/profile/slug*`, `/profile/share-kit`, `/analytics/summary`. `/leads` covers **all** cards, and each lead has `card_label`.
+
+Migration `c4d8e1a6b9f2` adds `label`, `is_primary` and `contact_email`/`contact_phone` to `profiles`. It makes each user's oldest card their primary card.
+
+Also fixed: `alembic upgrade` crashed when the database password contained `%` (for example `%40`), because Alembic's config parser treats `%` as special. `alembic/env.py` now escapes it.
 
 ### 3.6 Accessibility and quality bar
 - Every icon-only button has an `accessibilityLabel`.

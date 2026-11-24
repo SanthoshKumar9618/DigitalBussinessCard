@@ -6,6 +6,8 @@ import { useRouter } from "expo-router";
 
 import SafeScreen from "@/components/ui/Screen1";
 import { useApp } from "@/components/context/AppContext";
+import CardSwitcher from "@/components/cards/CardSwitcher";
+import { useCards } from "@/context/CardContext";
 import { getInsights, InsightsSummary } from "@/services/leadService";
 import { HIT, Radius, Space, Type } from "@/constants/design";
 
@@ -22,6 +24,7 @@ const SOURCE_LABELS: Record<string, string> = {
 export default function InsightsScreen() {
   const router = useRouter();
   const { colors } = useApp();
+  const { cardVersion, cards } = useCards();
   const [days, setDays] = useState<(typeof RANGES)[number]>(7);
   const [data, setData] = useState<InsightsSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +48,7 @@ export default function InsightsScreen() {
   useFocusEffect(
     useCallback(() => {
       load(days);
-    }, [load, days])
+    }, [load, days, cardVersion])
   );
 
   const stats = data
@@ -86,6 +89,12 @@ export default function InsightsScreen() {
             ))}
           </View>
         </View>
+
+        {cards.length > 1 && (
+          <View style={{ marginBottom: Space.lg }}>
+            <CardSwitcher />
+          </View>
+        )}
 
         {!data && !error && <ActivityIndicator style={{ marginTop: 48 }} color={colors.primary} />}
 

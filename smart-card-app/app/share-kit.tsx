@@ -21,6 +21,8 @@ import * as WebBrowser from "expo-web-browser";
 
 import SafeScreen from "@/components/ui/Screen1";
 import { useApp } from "@/components/context/AppContext";
+import CardSwitcher from "@/components/cards/CardSwitcher";
+import { useCards } from "@/context/CardContext";
 import { HIT, Radius, Space, Type } from "@/constants/design";
 import {
   addLink,
@@ -40,6 +42,7 @@ type SlugState = { checking: boolean; available: boolean | null; reason: string 
 export default function ShareKitScreen() {
   const router = useRouter();
   const { colors } = useApp();
+  const { cardVersion } = useCards();
 
   const [kit, setKit] = useState<ShareKit | null>(null);
   const [links, setLinks] = useState<ProfileLink[]>([]);
@@ -71,7 +74,7 @@ export default function ShareKitScreen() {
   useFocusEffect(
     useCallback(() => {
       load();
-    }, [load])
+    }, [load, cardVersion])
   );
 
   useEffect(() => () => { if (slugTimer.current) clearTimeout(slugTimer.current); }, []);
@@ -177,7 +180,8 @@ export default function ShareKitScreen() {
             <TouchableOpacity onPress={() => router.back()} style={styles.back} accessibilityLabel="Back">
               <Ionicons name="arrow-back" size={22} color={colors.text} />
             </TouchableOpacity>
-            <Text style={[Type.title, { color: colors.text }]}>Share kit</Text>
+            <Text style={[Type.title, { color: colors.text, flex: 1 }]}>Share kit</Text>
+            <CardSwitcher compact />
           </View>
 
           {!kit && !error && <ActivityIndicator style={{ marginTop: 48 }} color={colors.primary} />}

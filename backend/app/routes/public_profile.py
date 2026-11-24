@@ -16,6 +16,7 @@ from app.config.settings import settings
 from app.database.connection import get_db
 from app.database.models import Lead, Profile, ProfileLink, SlugAlias
 from app.services import analytics_service, wallet_service
+from app.services.cards import card_email, card_phone
 from app.services.visibility import get_visibility
 from app.utils import rate_limit
 from app.utils.exporters import build_vcard
@@ -125,8 +126,8 @@ def _public_payload(profile: Profile, vis) -> dict:
         "twitter": profile.twitter,
         "facebook": profile.facebook,
         "whatsapp": profile.whatsapp,
-        "email": profile.user.email if vis.show_email else None,
-        "phone": profile.user.phone if vis.show_phone else None,
+        "email": card_email(profile) if vis.show_email else None,
+        "phone": card_phone(profile) if vis.show_phone else None,
     }
 
 

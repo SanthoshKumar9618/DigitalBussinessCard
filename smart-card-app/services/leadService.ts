@@ -12,6 +12,8 @@ export type Lead = {
   source?: string | null;
   is_read: boolean;
   created_at: string;
+  card_id?: string | null;
+  card_label?: string | null;
 };
 
 export type InsightsSummary = {

@@ -12,7 +12,7 @@ from app.config.settings import settings
 from app.database.connection import get_db
 from app.database.models import NFCLink, Profile, ProfileLink, SlugAlias
 from app.services import wallet_service
-from app.utils.jwt_handler import get_current_user
+from app.services.cards import get_active_card, require_active_card
 from urllib.parse import quote
 
 router = APIRouter(prefix="/profile", tags=["Profile links"])
@@ -67,12 +67,6 @@ class SlugIn(BaseModel):
 
 
 # ---------------------------------------------------------------- helpers
-def _profile(user) -> Profile:
-    if not user.profile:
-        raise HTTPException(status_code=404, detail="Create your profile first")
-    return user.profile
-
-
 def _links(db: Session, profile_id) -> list[ProfileLink]:
     return (
         db.query(ProfileLink)
@@ -101,9 +95,9 @@ def slug_problem(db: Session, slug: str, profile: Profile | None = None) -> str 
 
 # ---------------------------------------------------------------- custom URL
 @router.get("/slug/check")
-def check_slug(slug: str, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def check_slug(slug: str, db: Session = Depends(get_db), card: Profile | None = Depends(get_active_card)):
     slug = slug.strip().lower()
-    problem = slug_problem(db, slug, user.profile)
+    problem = slug_problem(db, slug, card)
     return {
         "slug": slug,
         "available": problem is None,
@@ -113,8 +107,8 @@ def check_slug(slug: str, db: Session = Depends(get_db), user=Depends(get_curren
 
 
 @router.put("/slug")
-def change_slug(payload: SlugIn, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    profile = _profile(user)
+def change_slug(payload: SlugIn, db: Session = Depends(get_db), card: Profile = Depends(require_active_card)):
+    profile = card
     new = payload.slug.strip().lower()
     if new == profile.slug:
         return {"slug": new, "url": settings.public_profile_url(new)}
@@ -141,13 +135,13 @@ def change_slug(payload: SlugIn, db: Session = Depends(get_db), user=Depends(get
 
 # ---------------------------------------------------------------- custom links
 @router.get("/links", response_model=List[LinkOut])
-def list_links(db: Session = Depends(get_db), user=Depends(get_current_user)):
-    return _links(db, _profile(user).id)
+def list_links(db: Session = Depends(get_db), card: Profile = Depends(require_active_card)):
+    return _links(db, card.id)
 
 
 @router.post("/links", response_model=LinkOut, status_code=status.HTTP_201_CREATED)
-def add_link(payload: LinkIn, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    profile = _profile(user)
+def add_link(payload: LinkIn, db: Session = Depends(get_db), card: Profile = Depends(require_active_card)):
+    profile = card
     count = db.query(func.count(ProfileLink.id)).filter(ProfileLink.profile_id == profile.id).scalar() or 0
     if count >= MAX_LINKS:
         raise HTTPException(status_code=400, detail=f"You can add up to {MAX_LINKS} links.")
@@ -160,8 +154,8 @@ def add_link(payload: LinkIn, db: Session = Depends(get_db), user=Depends(get_cu
 
 
 @router.put("/links/order", response_model=List[LinkOut])
-def reorder_links(payload: LinkOrder, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    profile = _profile(user)
+def reorder_links(payload: LinkOrder, db: Session = Depends(get_db), card: Profile = Depends(require_active_card)):
+    profile = card
     links = {l.id: l for l in _links(db, profile.id)}
     if set(payload.ids) != set(links):
         raise HTTPException(status_code=400, detail="Send every link id exactly once.")
@@ -172,8 +166,8 @@ def reorder_links(payload: LinkOrder, db: Session = Depends(get_db), user=Depend
 
 
 @router.put("/links/{link_id}", response_model=LinkOut)
-def update_link(link_id: UUID, payload: LinkIn, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    profile = _profile(user)
+def update_link(link_id: UUID, payload: LinkIn, db: Session = Depends(get_db), card: Profile = Depends(require_active_card)):
+    profile = card
     link = db.query(ProfileLink).filter(ProfileLink.id == link_id, ProfileLink.profile_id == profile.id).first()
     if not link:
         raise HTTPException(status_code=404, detail="Link not found")
@@ -184,8 +178,8 @@ def update_link(link_id: UUID, payload: LinkIn, db: Session = Depends(get_db), u
 
 
 @router.delete("/links/{link_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_link(link_id: UUID, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    profile = _profile(user)
+def delete_link(link_id: UUID, db: Session = Depends(get_db), card: Profile = Depends(require_active_card)):
+    profile = card
     link = db.query(ProfileLink).filter(ProfileLink.id == link_id, ProfileLink.profile_id == profile.id).first()
     if not link:
         raise HTTPException(status_code=404, detail="Link not found")
@@ -195,12 +189,14 @@ def delete_link(link_id: UUID, db: Session = Depends(get_db), user=Depends(get_c
 
 # ---------------------------------------------------------------- share kit
 @router.get("/share-kit")
-def share_kit(user=Depends(get_current_user)):
+def share_kit(card: Profile = Depends(require_active_card)):
     """Everything the app needs for the Share kit screen."""
-    profile = _profile(user)
+    profile = card
     base = settings.APP_DOMAIN.rstrip("/")
     slug = quote(profile.slug)
     return {
+        "card_id": str(profile.id),
+        "label": profile.label,
         "slug": profile.slug,
         "profile_url": settings.public_profile_url(profile.slug),
         "signature_url": f"{base}/public/{slug}/signature",

@@ -20,6 +20,7 @@ import * as IntentLauncher from "expo-intent-launcher";
 
 import SafeScreen from "@/components/ui/Screen1";
 import { useApp } from "@/components/context/AppContext";
+import { useCards } from "@/context/CardContext";
 import { getContacts, searchContacts } from "@/services/contactService";
 import { deleteLead, exportCsv, getLeads, Lead, markLeadRead, timeAgo } from "@/services/leadService";
 import { assetUrl } from "@/services/api";
@@ -30,6 +31,8 @@ type Segment = "contacts" | "leads";
 export default function NetworkScreen() {
   const router = useRouter();
   const { colors } = useApp();
+  const { cards } = useCards();
+  const multiCard = cards.length > 1;
 
   const [segment, setSegment] = useState<Segment>("contacts");
   const [contacts, setContacts] = useState<any[]>([]);
@@ -148,7 +151,14 @@ export default function NetworkScreen() {
               </Text>
             )}
           </View>
-          <Text style={[styles.time, { color: colors.subText }]}>{timeAgo(item.created_at)}</Text>
+          <View style={{ alignItems: "flex-end" }}>
+            <Text style={[styles.time, { color: colors.subText }]}>{timeAgo(item.created_at)}</Text>
+            {multiCard && !!item.card_label && (
+              <Text style={[styles.badge, { color: colors.primary, backgroundColor: colors.primarySoft, marginTop: 4, marginRight: 0 }]}>
+                {item.card_label}
+              </Text>
+            )}
+          </View>
         </View>
 
         {!!item.note && (

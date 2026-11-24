@@ -7,7 +7,7 @@ import os
 from PIL import Image, UnidentifiedImageError
 from app.database.models import ProfileAudit
 from app.database.connection import get_db
-from app.utils.jwt_handler import get_current_user
+from app.services.cards import require_active_card
 from app.database.models import Profile
 
 router = APIRouter(
@@ -33,16 +33,8 @@ def get_extension(filename: str | None) -> str:
 async def upload_avatar(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    profile: Profile = Depends(require_active_card),
 ):
-    profile = (
-        db.query(Profile)
-        .filter(Profile.user_id == current_user.id)
-        .first()
-    )
-
-    if not profile:
-        raise HTTPException(status_code=404, detail="Profile not found")
 
     ext = get_extension(file.filename)
 
@@ -92,16 +84,8 @@ async def upload_avatar(
 @router.delete("/avatar", include_in_schema=False)
 async def delete_avatar(
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    profile: Profile = Depends(require_active_card),
 ):
-    profile = (
-        db.query(Profile)
-        .filter(Profile.user_id == current_user.id)
-        .first()
-    )
-
-    if not profile:
-        raise HTTPException(status_code=404, detail="Profile not found")
 
     if profile.avatar_url:
         filename = os.path.basename(profile.avatar_url)

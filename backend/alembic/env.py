@@ -7,14 +7,13 @@ from app.config.settings import settings
 from app.database.models import Base  # import your SQLAlchemy Base
 
 
-from app.config.settings import settings
-
-
 # Alembic Config object
 config = context.config
 
 # Set SQLAlchemy URL dynamically from Pydantic settings
-config.set_main_option("sqlalchemy.url", str(settings.DATABASE_URL))
+# Escape "%" (e.g. "%40" in a URL-encoded password): alembic's config parser
+# treats it as interpolation syntax and would otherwise crash.
+config.set_main_option("sqlalchemy.url", str(settings.DATABASE_URL).replace("%", "%%"))
 
 # Set up Python logging from Alembic config file
 if config.config_file_name is not None:

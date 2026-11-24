@@ -30,6 +30,11 @@ api.interceptors.request.use(async (config) => {
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+    // Which of the user's cards this request is about (multiple cards).
+    const cardId = await AsyncStorage.getItem("active_card_id");
+    if (cardId && !config.headers["X-Card-Id"]) {
+      config.headers["X-Card-Id"] = cardId;
+    }
   }
 
   // Let axios set multipart boundaries for file uploads.
@@ -45,6 +50,10 @@ api.interceptors.response.use(
   async (error) => {
     if (error.response?.status === 401) {
       await AsyncStorage.removeItem("access_token");
+    }
+    // The remembered card was deleted elsewhere: fall back to the primary card.
+    if (error.response?.status === 404 && error.response?.data?.detail === "Card not found") {
+      await AsyncStorage.removeItem("active_card_id");
     }
 
     if (__DEV__) {

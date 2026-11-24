@@ -43,6 +43,10 @@ class ProfileOut(ProfileBase):
     id: UUID
     slug: str
     avatar_url: Optional[str]
+    label: Optional[str] = None
+    is_primary: Optional[bool] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
 
     email: str
     phone: Optional[str]

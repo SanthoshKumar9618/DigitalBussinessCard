@@ -16,6 +16,7 @@ import * as Clipboard from "expo-clipboard";
 import QRCode from "react-native-qrcode-svg";
 import EditProfile from "./EditProfile";
 import { BASE_URL, publicProfileUrl } from "../../services/api";
+import CardSwitcher from "../cards/CardSwitcher";
 import { useRouter } from "expo-router";
 import { useApp } from "../../components/context/AppContext";
 import SafeScreen from "../ui/Screen1";
@@ -172,6 +173,11 @@ export default function ProfileView({ profile, onRefresh }: any) {
         <Animated.View
           style={[styles.container, { opacity: fade }]}
         >
+          {/* CARD SWITCHER (multiple cards) */}
+          <View style={{ marginBottom: 12 }}>
+            <CardSwitcher />
+          </View>
+
           {/* AVATAR */}
           <View style={styles.avatarWrap}>
             {profile.avatar_url ? (

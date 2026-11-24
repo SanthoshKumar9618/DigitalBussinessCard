@@ -1,6 +1,7 @@
 import { Stack } from "expo-router";
 import { View } from "react-native";
 import { AuthProvider } from "../context/AuthContext";
+import { CardProvider } from "../context/CardContext";
 import { AppProvider, useApp } from "../components/context/AppContext";
 import { RefreshProvider } from "@/components/context/RefreshContext";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -21,6 +22,7 @@ function ThemedBackground({ children }: { children: React.ReactNode }) {
 export default function RootLayout() {
   return (
     <AuthProvider>
+      <CardProvider>
       <RefreshProvider>
         <AppProvider>
           <GestureHandlerRootView style={{ flex: 1 }}>
@@ -30,6 +32,7 @@ export default function RootLayout() {
           </GestureHandlerRootView>
         </AppProvider>
       </RefreshProvider>
+      </CardProvider>
     </AuthProvider>
   );
 }

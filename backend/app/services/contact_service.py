@@ -13,8 +13,8 @@ def _contact_details(db: Session, profile: Profile) -> tuple[str | None, str | N
         return None, None
     vis = get_visibility(db, profile.user_id)
     return (
-        user.phone if vis.show_phone else None,
-        user.email if vis.show_email else None,
+        (profile.contact_phone or user.phone) if vis.show_phone else None,
+        (profile.contact_email or user.email) if vis.show_email else None,
     )
 
 

@@ -11,6 +11,22 @@ from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
+def unique_slug(db: Session, text: str) -> str:
+    """A free, valid slug based on `text` (e.g. a name), adding -1, -2… if needed."""
+    base_slug = (slugify(text or "") or "user")[:36].strip("-") or "user"
+    slug = base_slug
+    counter = 1
+    while (
+        db.query(Profile).filter(Profile.slug == slug).first()
+        or db.get(SlugAlias, slug)
+        or slug in RESERVED_SLUGS
+        or len(slug) < 3
+    ):
+        slug = f"{base_slug}-{counter}"
+        counter += 1
+    return slug
+
+
 async def create_profile(db: Session, user, payload):
     # 1. Check if profile already exists
     existing = (
@@ -25,23 +41,14 @@ async def create_profile(db: Session, user, payload):
         )
 
     # 2. Generate unique slug
-    base_slug = slugify(user.name) or "user"
-    slug = base_slug
-    counter = 1
-
-    while (
-        db.query(Profile).filter(Profile.slug == slug).first()
-        or db.get(SlugAlias, slug)
-        or slug in RESERVED_SLUGS
-        or len(slug) < 3
-    ):
-        slug = f"{base_slug}-{counter}"
-        counter += 1
+    slug = unique_slug(db, user.name)
 
     # 3. Create profile
     profile = Profile(
         user_id=user.id,
         slug=slug,
+        label="Main",
+        is_primary=True,
         display_name=user.name,
         job_title=payload.job_title,
         company=payload.company,
@@ -62,13 +69,7 @@ async def create_profile(db: Session, user, payload):
     return profile
 
 
-async def update_profile(db: Session, user_id: str, payload):
-    profile = (
-        db.query(Profile)
-        .filter(Profile.user_id == user_id)
-        .first()
-    )
-
+async def update_profile(db: Session, profile: Profile, payload):
     if not profile:
         return None
 
@@ -140,10 +141,3 @@ async def update_profile(db: Session, user_id: str, payload):
 
 async def get_profile_by_slug(db: Session, slug: str):
     return db.query(Profile).filter(Profile.slug == slug).first()
-
-async def get_profile_by_user(db: Session, user_id: str):
-    return (
-        db.query(Profile)
-        .filter(Profile.user_id == user_id)
-        .first()
-    )
