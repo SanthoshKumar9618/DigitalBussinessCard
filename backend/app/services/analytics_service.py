@@ -14,7 +14,7 @@ from app.database.models import Lead, ProfileAudit
 
 logger = logging.getLogger(__name__)
 
-VALID_SOURCES = {"qr", "nfc", "link", "app"}
+VALID_SOURCES = {"qr", "nfc", "link", "app", "email", "wallet"}
 TRACKED_ACTIONS = ("profile_view", "vcard_download", "contact_saved", "lead_submitted")
 
 

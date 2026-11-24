@@ -2,7 +2,8 @@ import logging
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from app.database.models import Profile
+from app.database.models import Profile, SlugAlias
+from app.routes.profile_links import RESERVED_SLUGS
 from slugify import slugify
 from app.services.contact_service import get_all_owners_for_profile
 from app.utils.notification import send_email
@@ -28,7 +29,12 @@ async def create_profile(db: Session, user, payload):
     slug = base_slug
     counter = 1
 
-    while db.query(Profile).filter(Profile.slug == slug).first():
+    while (
+        db.query(Profile).filter(Profile.slug == slug).first()
+        or db.get(SlugAlias, slug)
+        or slug in RESERVED_SLUGS
+        or len(slug) < 3
+    ):
         slug = f"{base_slug}-{counter}"
         counter += 1
 

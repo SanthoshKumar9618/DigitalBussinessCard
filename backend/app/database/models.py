@@ -1,6 +1,7 @@
 # backend/app/database/models.py
 import uuid
 from sqlalchemy import (
+    Integer,
     Column,
     String,
     Boolean,
@@ -297,3 +298,25 @@ class Lead(Base):
 
     def __repr__(self):
         return f"<Lead {self.name} -> {self.profile_id}>"
+
+
+# -------------------- Custom links on a profile --------------------
+class ProfileLink(Base):
+    __tablename__ = "profile_links"
+    __table_args__ = (Index("ix_profile_links_profile_pos", "profile_id", "position"),)
+
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    profile_id = Column(PG_UUID(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False)
+    label = Column(String(80), nullable=False)
+    url = Column(String(1024), nullable=False)
+    position = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+# -------------------- Old slugs keep working after a rename --------------------
+class SlugAlias(Base):
+    __tablename__ = "slug_aliases"
+
+    slug = Column(String(140), primary_key=True)
+    profile_id = Column(PG_UUID(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

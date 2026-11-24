@@ -10,7 +10,14 @@ import { getInsights, InsightsSummary } from "@/services/leadService";
 import { HIT, Radius, Space, Type } from "@/constants/design";
 
 const RANGES = [7, 30] as const;
-const SOURCE_LABELS: Record<string, string> = { qr: "QR code", nfc: "NFC tap", link: "Link", app: "In app" };
+const SOURCE_LABELS: Record<string, string> = {
+  qr: "QR code",
+  nfc: "NFC tap",
+  link: "Link",
+  app: "In app",
+  email: "Email signature",
+  wallet: "Wallet pass",
+};
 
 export default function InsightsScreen() {
   const router = useRouter();

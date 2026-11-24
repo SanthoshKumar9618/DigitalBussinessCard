@@ -51,6 +51,8 @@
     .btn-primary { background: var(--gold); color: var(--on-gold); }
     .btn-outline { background: transparent; color: var(--text); border: 1.5px solid var(--border); }
     .btn svg { width: 20px; height: 20px; }
+    .wallet { display: flex; gap: 10px; }
+    .wallet .btn-wallet { flex: 1; background: #000; color: #fff; font-size: 14px; min-height: 46px; border: 1px solid #333; }
     .links { margin-top: 18px; text-align: left; }
     .links a { display: flex; align-items: center; gap: 12px; padding: 14px 4px; color: var(--text);
       text-decoration: none; border-top: 1px solid var(--border); }
@@ -105,6 +107,12 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14"/></svg>
         Save contact
       </a>
+      {% if wallet_apple_url or wallet_google_url %}
+      <div class="wallet">
+        {% if wallet_apple_url %}<a class="btn btn-wallet" href="{{ wallet_apple_url }}">Add to Apple Wallet</a>{% endif %}
+        {% if wallet_google_url %}<a class="btn btn-wallet" href="{{ wallet_google_url }}" rel="nofollow">Add to Google Wallet</a>{% endif %}
+      </div>
+      {% endif %}
       <a class="btn btn-outline" href="#exchange">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg>
         Share my details

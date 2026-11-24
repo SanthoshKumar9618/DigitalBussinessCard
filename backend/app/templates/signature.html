@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Email signature · {{ name }}</title>
+  <style>
+    :root { --bg:#F7F7F5; --card:#FFFFFF; --border:#E5E7EB; --text:#111827; --sub:#6B7280; --gold:#B08A35; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+    .wrap { max-width: 640px; margin: 0 auto; padding: 24px 16px 48px; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    p.lead { color: var(--sub); margin: 0 0 20px; }
+    .preview { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; overflow-x: auto; }
+    .preview .label { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--sub); margin-bottom: 14px; }
+    .btn { display:inline-flex; align-items:center; justify-content:center; min-height: 48px; padding: 0 22px; border-radius: 14px;
+      border: 0; background: var(--gold); color: #fff; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 16px; width: 100%; }
+    .btn.secondary { background: transparent; color: var(--text); border: 1.5px solid var(--border); }
+    .status { color: #15803D; min-height: 22px; margin-top: 8px; font-size: 14px; }
+    details { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; margin-top: 12px; }
+    summary { cursor: pointer; font-weight: 600; }
+    ol { padding-left: 20px; margin: 10px 0 0; color: #374151; }
+    textarea { width: 100%; min-height: 120px; font: 12px/1.4 ui-monospace, Menlo, monospace; border-radius: 12px; border: 1px solid var(--border); padding: 10px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <h1>Your email signature</h1>
+    <p class="lead">Copy it once and paste it into your email app. It links to your SmartCard, so people can save your contact in one tap.</p>
+
+    <section class="preview" aria-label="Signature preview">
+      <div class="label">Preview</div>
+      <div id="signature">{{ signature_html | safe }}</div>
+    </section>
+
+    <button class="btn" id="copy" type="button">Copy signature</button>
+    <button class="btn secondary" id="copy-html" type="button">Copy as HTML code</button>
+    <div class="status" id="status" role="status"></div>
+
+    <details>
+      <summary>Gmail</summary>
+      <ol><li>Open Gmail on a computer → ⚙️ Settings → See all settings.</li><li>Under <b>Signature</b>, create a new one and paste.</li><li>Scroll down and click <b>Save Changes</b>.</li></ol>
+    </details>
+    <details>
+      <summary>Outlook</summary>
+      <ol><li>Settings → Mail → Compose and reply (or File → Options → Mail → Signatures).</li><li>Create a new signature, paste, then save.</li></ol>
+    </details>
+    <details>
+      <summary>Apple Mail (Mac / iPhone)</summary>
+      <ol><li>Mac: Mail → Settings → Signatures → +, then paste.</li><li>iPhone: Settings → Apps → Mail → Signature, then paste.</li></ol>
+    </details>
+    <details>
+      <summary>HTML code</summary>
+      <textarea readonly id="code" aria-label="Signature HTML">{{ signature_html }}</textarea>
+    </details>
+  </main>
+
+  <script>
+    (function () {
+      var sig = document.getElementById("signature");
+      var status = document.getElementById("status");
+      function done(msg) { status.textContent = msg; setTimeout(function () { status.textContent = ""; }, 4000); }
+      function fallbackCopy() {
+        var range = document.createRange();
+        range.selectNodeContents(sig);
+        var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+        var ok = document.execCommand("copy"); sel.removeAllRanges();
+        done(ok ? "Copied! Paste it into your email signature settings." : "Select the preview and copy it manually.");
+      }
+      document.getElementById("copy").addEventListener("click", function () {
+        var html = sig.innerHTML;
+        if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+          navigator.clipboard.write([new ClipboardItem({
+            "text/html": new Blob([html], { type: "text/html" }),
+            "text/plain": new Blob([sig.innerText], { type: "text/plain" })
+          })]).then(function () { done("Copied! Paste it into your email signature settings."); }, fallbackCopy);
+        } else { fallbackCopy(); }
+      });
+      document.getElementById("copy-html").addEventListener("click", function () {
+        var code = document.getElementById("code").value;
+        (navigator.clipboard ? navigator.clipboard.writeText(code) : Promise.reject())
+          .then(function () { done("HTML code copied."); }, function () { done("Open “HTML code” below and copy it."); });
+      });
+    })();
+  </script>
+</body>
+</html>

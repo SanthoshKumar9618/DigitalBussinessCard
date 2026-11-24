@@ -96,6 +96,25 @@ export default function SettingsScreen() {
           />
         </SettingsSection>
 
+        {/* SHARE KIT */}
+        <SettingsSection title="Share kit" colors={colors}>
+          <SettingsRow
+            label="Card link & custom links"
+            colors={colors}
+            onPress={() => router.push("/share-kit")}
+          />
+          <SettingsRow
+            label="Email signature & Wallet"
+            colors={colors}
+            onPress={() => router.push("/share-kit")}
+          />
+          <SettingsRow
+            label="Insights"
+            colors={colors}
+            onPress={() => router.push("/insights")}
+          />
+        </SettingsSection>
+
         {/* CARD & TEMPLATE */}
         <SettingsSection title="Card & Template" colors={colors}>
   <SettingsRow

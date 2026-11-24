@@ -63,12 +63,30 @@ The goal is that every scan turns into either a saved contact or a captured lead
 | 1.7 | **Export contacts and leads as CSV** | Move data into any CRM today |
 | 1.8 | **Design tokens** + Network screen redesign | Consistent and light-mode safe |
 
-### Phase 2: Reach
-- **Apple Wallet and Google Wallet passes.** Needs an Apple Pass Type ID certificate and a Google Wallet issuer account.
-- **Email signature generator** (HTML snippet with photo + QR).
-- **Real email delivery** (Resend/SendGrid) for OTPs, lead alerts and "X saved your card" notifications. This is the audit's B15 blocker.
-- **Custom profile links:** pick your own slug and add unlimited custom links (portfolio, calendar, payment).
-- **Multiple cards per user** (work / personal).
+### Phase 2: Reach (built, except multiple cards)
+
+| # | Feature | Status |
+|---|---|---|
+| 2.1 | **Real email delivery** (Resend API, SMTP, or console) for OTPs, **lead alerts**, and contact-update notices. Sent in the background, branded HTML. Fixes audit item B15. | ✅ Needs a `RESEND_API_KEY` |
+| 2.2 | **Custom card link** (`/public/view/your-name`) with a live availability check and reserved words. **Old links redirect (301)**, so printed QR codes and NFC tags keep working. | ✅ |
+| 2.3 | **Custom links** (up to 20: portfolio, booking, payment) with reordering, shown on the card | ✅ |
+| 2.4 | **Email signature generator**: email-safe HTML with avatar, contacts and a QR code, one-tap copy, how-to for Gmail/Outlook/Apple Mail. Views are tracked as source `email`. | ✅ |
+| 2.5 | **Apple Wallet (.pkpass) and Google Wallet** passes with your QR. Buttons appear on the card and in the Share kit only when configured. | ✅ Needs Apple/Google credentials |
+| 2.6 | **Multiple cards per user** (work / personal) | ⏳ Phase 2b: every endpoint assumes one profile per user, so this needs its own migration and testing |
+
+**Turning on the parts that need credentials**
+
+- **Email:** create a Resend account, verify your domain, then set `EMAIL_PROVIDER=resend`, `RESEND_API_KEY=re_…` and `EMAIL_FROM="SmartCard <hello@yourdomain.com>"`.
+- **Apple Wallet:**
+  1. In the Apple Developer account, go to Identifiers → Pass Type IDs and create one.
+  2. Create its certificate and export the certificate and its key as PEM.
+  3. Download the Apple WWDR G4 certificate (also PEM).
+  4. Set the `APPLE_*` variables. Keep the key files out of git.
+- **Google Wallet:**
+  1. In the Google Pay & Wallet Console, get an issuer ID.
+  2. In Google Cloud, enable the Wallet API, create a service account and download its JSON key.
+  3. Add the service account as a user in the Wallet console.
+  4. Set `GOOGLE_WALLET_ISSUER_ID` and `GOOGLE_WALLET_SA_KEY_PATH`.
 
 ### Phase 3: Intelligence
 - **Paper-card scanner:** on-device OCR, then a pre-filled contact.
@@ -202,6 +220,20 @@ Where views came from: QR 60% · NFC 25% · Link 15%
 | GET | `/analytics/summary?days=7` | ✅ | Insights |
 | PATCH | `/contacts/{id}` | ✅ | Edit notes and tag |
 | GET | `/contacts/export.csv` | ✅ | Contacts CSV |
+
+**Phase 2 endpoints**
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| GET | `/profile/share-kit` | ✅ | All share URLs for the app |
+| GET / PUT | `/profile/slug/check?slug=` · `/profile/slug` | ✅ | Check / change the card link |
+| GET / POST | `/profile/links` | ✅ | List / add custom links |
+| PUT / DELETE | `/profile/links/{id}` · PUT `/profile/links/order` | ✅ | Edit, remove, reorder |
+| GET | `/public/{slug}/qr.png?src=&size=` | — | QR image |
+| GET | `/public/{slug}/signature` | — | Email signature builder page |
+| GET | `/public/{slug}/wallet/apple` · `/wallet/google` | — | Wallet passes (503 until configured) |
+
+Run `alembic upgrade head` again: migration `b7e2d4f1c8a3` adds `profile_links` and `slug_aliases`.
 
 ### 3.6 Accessibility and quality bar
 - Every icon-only button has an `accessibilityLabel`.

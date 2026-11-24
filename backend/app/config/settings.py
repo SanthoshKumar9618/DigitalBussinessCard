@@ -23,10 +23,26 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str | None = None
 
     # ---------------- EMAIL ----------------
-    SMTP_SERVER: str
-    SMTP_PORT: int
-    SMTP_EMAIL: str
-    SMTP_PASSWORD: str
+    # console = log only (dev) · resend = Resend HTTPS API · smtp = SMTP server
+    EMAIL_PROVIDER: str = "console"
+    EMAIL_FROM: str = "SmartCard <onboarding@resend.dev>"
+    RESEND_API_KEY: str | None = None
+    SMTP_SERVER: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_EMAIL: str | None = None
+    SMTP_PASSWORD: str | None = None
+
+    # ---------------- WALLET PASSES (optional) ----------------
+    # Apple: Pass Type ID certificate + key (PEM) and Apple WWDR G4 cert (PEM)
+    APPLE_PASS_TYPE_ID: str | None = None
+    APPLE_TEAM_ID: str | None = None
+    APPLE_PASS_CERT_PATH: str | None = None
+    APPLE_PASS_KEY_PATH: str | None = None
+    APPLE_PASS_KEY_PASSWORD: str | None = None
+    APPLE_WWDR_CERT_PATH: str | None = None
+    # Google: Wallet issuer ID + service account JSON key file
+    GOOGLE_WALLET_ISSUER_ID: str | None = None
+    GOOGLE_WALLET_SA_KEY_PATH: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=".env",

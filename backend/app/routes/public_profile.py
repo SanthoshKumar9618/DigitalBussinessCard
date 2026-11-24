@@ -1,20 +1,25 @@
 """Public (no-login) endpoints: what a person sees after scanning a card."""
+import io
 import os
 import re
+from html import escape
 from urllib.parse import quote
 
+import qrcode
+
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.config.settings import settings
 from app.database.connection import get_db
-from app.database.models import Lead, Profile
-from app.services import analytics_service
+from app.database.models import Lead, Profile, ProfileLink, SlugAlias
+from app.services import analytics_service, wallet_service
 from app.services.visibility import get_visibility
 from app.utils import rate_limit
 from app.utils.exporters import build_vcard
+from app.utils.notification import send_lead_alert
 
 router = APIRouter(prefix="/public", tags=["Public Profile"])
 
@@ -31,6 +36,7 @@ ICONS = {
     "web": _SVG.format('<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/>'),
     "linkedin": _SVG.format('<path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6zM2 9h4v12H2zM4 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4z"/>'),
     "twitter": _SVG.format('<path d="M4 4l16 16M20 4 4 20"/>'),
+    "link": _SVG.format('<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>'),
     "facebook": _SVG.format('<path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>'),
 }
 
@@ -49,8 +55,23 @@ SOCIAL_BASES = {
 
 
 # ---------------------------------------------------------------- helpers
-def _get_public_profile(db: Session, slug: str):
+class _Moved(Exception):
+    def __init__(self, slug: str):
+        self.slug = slug
+
+
+def _get_public_profile(db: Session, slug: str, follow_alias: bool = True):
+    """Find a public profile by slug. Old slugs (after a rename) resolve to the
+    profile; with follow_alias=False they raise _Moved so HTML routes can redirect."""
     profile = db.query(Profile).filter(Profile.slug == slug).first()
+    if not profile:
+        alias = db.get(SlugAlias, slug)
+        if alias:
+            if not follow_alias:
+                target = db.get(Profile, alias.profile_id)
+                if target:
+                    raise _Moved(target.slug)
+            profile = db.get(Profile, alias.profile_id)
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
     vis = get_visibility(db, profile.user_id)
@@ -109,19 +130,37 @@ def _public_payload(profile: Profile, vis) -> dict:
     }
 
 
+def _custom_links(db: Session, profile_id) -> list[dict]:
+    rows = (
+        db.query(ProfileLink)
+        .filter(ProfileLink.profile_id == profile_id)
+        .order_by(ProfileLink.position, ProfileLink.created_at)
+        .all()
+    )
+    return [{"label": r.label, "url": r.url} for r in rows if _safe_http(r.url)]
+
+
+def _moved_redirect(request: Request, path_template: str, slug: str) -> RedirectResponse:
+    query = f"?{request.url.query}" if request.url.query else ""
+    return RedirectResponse(path_template.format(slug=quote(slug)) + query, status_code=301)
+
+
 # ---------------------------------------------------------------- JSON API
 @router.get("/{slug}")
 def get_public_profile(slug: str, src: str | None = None, db: Session = Depends(get_db)):
     profile, vis = _get_public_profile(db, slug)
     if src:  # only count views when the caller says where they came from
         analytics_service.log_event(db, profile.id, "profile_view", src)
-    return _public_payload(profile, vis)
+    return {**_public_payload(profile, vis), "links": _custom_links(db, profile.id)}
 
 
 # ---------------------------------------------------------------- vCard
 @router.get("/{slug}/vcard")
-def download_vcard(slug: str, src: str | None = None, db: Session = Depends(get_db)):
-    profile, vis = _get_public_profile(db, slug)
+def download_vcard(slug: str, request: Request, src: str | None = None, db: Session = Depends(get_db)):
+    try:
+        profile, vis = _get_public_profile(db, slug, follow_alias=False)
+    except _Moved as m:
+        return _moved_redirect(request, "/public/{slug}/vcard", m.slug)
     data = _public_payload(profile, vis)
 
     vcf = build_vcard(
@@ -195,6 +234,14 @@ def submit_lead(
     analytics_service.log_event(db, profile.id, "lead_submitted", source, commit=False)
     db.commit()
 
+    owner = profile.user
+    if owner and owner.email and owner.email_verified:
+        send_lead_alert(
+            owner.email,
+            profile.display_name or owner.name,
+            {"name": name, "email": email, "phone": phone, "company": company, "note": note},
+        )
+
     if wants_json:
         return {"ok": True}
     return RedirectResponse(f"{back}&sent=1#exchange", status_code=303)
@@ -211,7 +258,10 @@ def public_view(
     db: Session = Depends(get_db),
 ):
     """Landing page people see after scanning a QR / tapping NFC / opening a link."""
-    profile, vis = _get_public_profile(db, slug)
+    try:
+        profile, vis = _get_public_profile(db, slug, follow_alias=False)
+    except _Moved as m:
+        return _moved_redirect(request, "/public/view/{slug}", m.slug)
     data = _public_payload(profile, vis)
     source = analytics_service.normalize_source(src)
 
@@ -236,6 +286,9 @@ def public_view(
         if url:
             links.append({"href": url, "label": label, "icon": ICONS[kind]})
 
+    for link in _custom_links(db, profile.id):
+        links.append({"href": link["url"], "label": link["label"], "icon": ICONS["link"]})
+
     name = data["display_name"] or "Contact"
     initials = "".join(w[0] for w in name.split()[:2]).upper() or "?"
     subtitle = " · ".join(x for x in (data["job_title"], data["company"]) if x)
@@ -258,5 +311,105 @@ def public_view(
             "sent": bool(sent),
             "error": LEAD_ERRORS.get(error or ""),
             "home_url": settings.APP_DOMAIN,
+            "wallet_apple_url": f"/public/{quote(profile.slug)}/wallet/apple" if wallet_service.apple_enabled() else None,
+            "wallet_google_url": f"/public/{quote(profile.slug)}/wallet/google" if wallet_service.google_enabled() else None,
         },
     )
+
+
+# ---------------------------------------------------------------- QR image
+@router.get("/{slug}/qr.png")
+def public_qr(slug: str, src: str = "qr", size: int = 8, db: Session = Depends(get_db)):
+    """PNG QR code of the profile URL (used in email signatures, print, etc.)."""
+    profile, _ = _get_public_profile(db, slug)
+    url = f"{settings.public_profile_url(profile.slug)}?src={analytics_service.normalize_source(src)}"
+    qr = qrcode.QRCode(border=2, box_size=max(2, min(size, 16)))
+    qr.add_data(url)
+    qr.make(fit=True)
+    buf = io.BytesIO()
+    qr.make_image(fill_color="black", back_color="white").save(buf, format="PNG")
+    buf.seek(0)
+    return StreamingResponse(buf, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+
+
+# ---------------------------------------------------------------- Email signature
+def build_signature_html(profile: Profile, data: dict) -> str:
+    """Email-client-safe signature: tables + inline styles, every value escaped."""
+    e = lambda v: escape(str(v), quote=True)  # noqa: E731
+    base = settings.APP_DOMAIN.rstrip("/")
+    card_url = f"{settings.public_profile_url(profile.slug)}?src=email"
+    qr_url = f"{base}/public/{quote(profile.slug)}/qr.png?src=email&size=4"
+    avatar = _absolute(data["avatar_url"])
+    subtitle = " · ".join(x for x in (data["job_title"], data["company"]) if x)
+
+    contact_bits = []
+    if data["phone"]:
+        contact_bits.append(f'<a href="tel:{e(_digits(data["phone"]) or data["phone"])}" style="color:#374151;text-decoration:none">{e(data["phone"])}</a>')
+    if data["email"]:
+        contact_bits.append(f'<a href="mailto:{e(data["email"])}" style="color:#374151;text-decoration:none">{e(data["email"])}</a>')
+    website = _safe_http(data["website"])
+    if website:
+        shown = re.sub(r"^https?://(www\.)?", "", website).rstrip("/")
+        contact_bits.append(f'<a href="{e(website)}" style="color:#374151;text-decoration:none">{e(shown)}</a>')
+
+    avatar_cell = (
+        f'<td style="padding-right:14px;vertical-align:top"><img src="{e(avatar)}" width="64" height="64" alt="" '
+        f'style="display:block;width:64px;height:64px;border-radius:32px;object-fit:cover"></td>'
+        if avatar else ""
+    )
+    return (
+        '<table cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#111827;line-height:1.45">'
+        "<tr>"
+        f"{avatar_cell}"
+        '<td style="vertical-align:top;padding-right:16px;border-right:2px solid #B08A35">'
+        f'<div style="font-size:16px;font-weight:bold;color:#111827">{e(data["display_name"])}</div>'
+        + (f'<div style="color:#6B7280">{e(subtitle)}</div>' if subtitle else "")
+        + (f'<div style="margin-top:6px">{" &nbsp;·&nbsp; ".join(contact_bits)}</div>' if contact_bits else "")
+        + f'<div style="margin-top:8px"><a href="{e(card_url)}" style="color:#B08A35;font-weight:bold;text-decoration:none">Save my contact →</a></div>'
+        "</td>"
+        f'<td style="vertical-align:top;padding-left:16px"><a href="{e(card_url)}"><img src="{e(qr_url)}" width="72" height="72" alt="QR code to my contact card" style="display:block;width:72px;height:72px"></a></td>'
+        "</tr></table>"
+    )
+
+
+@router.get("/{slug}/signature", response_class=HTMLResponse)
+def email_signature(slug: str, request: Request, db: Session = Depends(get_db)):
+    try:
+        profile, vis = _get_public_profile(db, slug, follow_alias=False)
+    except _Moved as m:
+        return _moved_redirect(request, "/public/{slug}/signature", m.slug)
+    data = _public_payload(profile, vis)
+    return templates.TemplateResponse(
+        request,
+        "signature.html",
+        {"name": data["display_name"], "signature_html": build_signature_html(profile, data)},
+    )
+
+
+# ---------------------------------------------------------------- Wallet passes
+@router.get("/{slug}/wallet/apple")
+def apple_wallet_pass(slug: str, db: Session = Depends(get_db)):
+    if not wallet_service.apple_enabled():
+        raise HTTPException(status_code=503, detail="Apple Wallet is not configured on this server")
+    profile, vis = _get_public_profile(db, slug)
+    data = _public_payload(profile, vis)
+    blob = wallet_service.build_pkpass(profile, data, settings.public_profile_url(profile.slug))
+    analytics_service.log_event(db, profile.id, "wallet_added", "wallet")
+    return Response(
+        blob,
+        media_type="application/vnd.apple.pkpass",
+        headers={"Content-Disposition": f'attachment; filename="{profile.slug}.pkpass"'},
+    )
+
+
+@router.get("/{slug}/wallet/google")
+def google_wallet_pass(slug: str, db: Session = Depends(get_db)):
+    if not wallet_service.google_enabled():
+        raise HTTPException(status_code=503, detail="Google Wallet is not configured on this server")
+    profile, vis = _get_public_profile(db, slug)
+    data = _public_payload(profile, vis)
+    url = wallet_service.google_save_url(
+        profile, data, settings.public_profile_url(profile.slug), _absolute(data["avatar_url"])
+    )
+    analytics_service.log_event(db, profile.id, "wallet_added", "wallet")
+    return RedirectResponse(url, status_code=302)
