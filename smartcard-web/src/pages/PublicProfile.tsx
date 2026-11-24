@@ -17,14 +17,20 @@ type Profile = {
 const PublicProfile = () => {
   const { slug } = useParams();
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/public/${slug}`)
-      .then(res => res.json())
-      .then(setProfile);
+    if (!slug) return;
+    fetch(`${API_BASE_URL}/public/${encodeURIComponent(slug)}`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(res.status === 404 ? "Profile not found" : "Could not load profile");
+        return res.json();
+      })
+      .then(setProfile)
+      .catch((e: Error) => setError(e.message));
   }, [slug]);
 
-  // ⛔ Wait until profile is loaded
+  if (error) return <p style={{ textAlign: "center" }}>{error}</p>;
   if (!profile) return <p>Loading...</p>;
 
   // ✅ SAFE: profile exists here
@@ -35,12 +41,10 @@ const PublicProfile = () => {
       ? `${API_BASE_URL}${profile.avatar_url}`
       : null;
 
-    console.log("SLUG FROM URL:", slug);
-
 
   return (
     <div style={{ maxWidth: 420, margin: "auto", textAlign: "center" }}>
-      {avatarUrl && <img src={avatarUrl} width={120} />}
+      {avatarUrl && <img src={avatarUrl} width={120} alt={profile.display_name} />}
 
       <h1>{profile.display_name}</h1>
       <h3>
@@ -57,7 +61,7 @@ const PublicProfile = () => {
         )}
         {profile.email && <a href={`mailto:${profile.email}`}>✉️ Email</a>}
         {profile.website && (
-          <a href={profile.website} target="_blank">🌐 Website</a>
+          <a href={profile.website} target="_blank" rel="noopener noreferrer">🌐 Website</a>
         )}
       </div>
     </div>

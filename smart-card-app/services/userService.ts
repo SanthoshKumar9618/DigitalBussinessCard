@@ -10,6 +10,6 @@ import api from "./api";
  export function sendEmailOtp(email: string) { 
   return api.post("/user/email/send-otp", { email }); 
 } 
- export function verifyEmailOtp(otp: string) { 
-  return api.post("/user/email/verify-otp", { otp }); 
+ export function verifyEmailOtp(email: string, otp: string) {
+  return api.post("/user/email/verify-otp", { email, otp });
 }

@@ -10,7 +10,7 @@ print("=" * 60)
 print("\nStep 1: Loading environment...")
 try:
     from app.config.settings import settings
-    print(f"✓ Settings loaded. DB: {settings.POSTGRES_HOST}")
+    print(f"✓ Settings loaded. DB host: {settings.POSTGRES_DSN.hosts()[0]['host']}")
 except Exception as e:
     print(f"✗ Settings loading failed: {e}")
     traceback.print_exc()

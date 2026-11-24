@@ -26,3 +26,5 @@ backend/uploads/
 
 # mypy
 .mypy_cache/
+
+!.env.example

@@ -70,18 +70,13 @@ class Token(BaseModel):
     token_type: str = "bearer"
 
 class VerifyEmail(BaseModel):
-    user_id: str
+    user_id: UUID
     otp: str
 
-class ResetPassword(BaseModel):
-    identifier: str   # ✅ REQUIRED but hidden from UI
-    otp: str
-    password: str
-    confirm_password: str
-    @validator("confirm_password")
-    def passwords_match(cls, v, values, **kwargs):  
-        pw = values.get("password")
-        if pw and v != pw:
-            raise ValueError("Passwords do not match")
-        return v
-    
+
+class ResendEmailOTP(BaseModel):
+    user_id: UUID
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str

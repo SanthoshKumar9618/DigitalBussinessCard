@@ -38,17 +38,14 @@ export default function RegisterScreen() {
     };
 
     const data = await registerUser(payload);
-     router.push({
-     pathname: "/verify-email",
-     params: { userId: data.user_id }
+    // Registration returns no token: the user logs in after verifying the OTP.
+    router.push({
+      pathname: "/verify-email",
+      params: { userId: data.user_id },
     });
-await login(data.access_token);
-
-// 🔑 FORCE INDEX.TSX TO MOUNT
-router.replace("/");
 
   } catch (err: any) {
-    alert("Registration failed");
+    alert(err?.response?.data?.detail || "Registration failed");
   }
 };
 

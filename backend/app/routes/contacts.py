@@ -16,12 +16,14 @@ router = APIRouter(prefix="/contacts", tags=["Contacts"])
 # SAVE CONTACT (QR / NFC)
 # -----------------------------
 @router.post("/", response_model=ContactOut, status_code=status.HTTP_201_CREATED)
-async def save_contact(
+def save_contact(
     payload: ContactCreate,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
     contact = contact_service.add_contact(db, current_user.id, payload)
+    if not contact:
+        raise HTTPException(status_code=404, detail="Profile not found")
     return contact
 
 
@@ -30,8 +32,8 @@ async def save_contact(
 # -----------------------------
 @router.get("/", response_model=List[ContactOut])
 def list_contacts(
-    skip: int = 0,
-    limit: int = 50,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
@@ -43,12 +45,27 @@ def list_contacts(
 # -----------------------------
 @router.get("/search", response_model=List[ContactOut])
 def search_contacts(
-    q: str,
+    q: str = Query(..., min_length=1, max_length=100),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
     return contact_service.search_contacts(db, current_user.id, q)
 
+
+
+# -----------------------------
+# GET ONE CONTACT
+# -----------------------------
+@router.get("/{contact_id}", response_model=ContactOut)
+def get_contact(
+    contact_id: UUID,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    contact = contact_service.get_contact(db, current_user.id, contact_id)
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact not found")
+    return contact
 
 
 # -----------------------------

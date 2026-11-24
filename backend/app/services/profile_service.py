@@ -1,10 +1,14 @@
-from app.services import user
+import logging
+
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from app.database.models import Profile
 from slugify import slugify
 from app.services.contact_service import get_all_owners_for_profile
 from app.utils.notification import send_email
+from app.config.settings import settings
+
+logger = logging.getLogger(__name__)
 
 async def create_profile(db: Session, user, payload):
     # 1. Check if profile already exists
@@ -20,7 +24,7 @@ async def create_profile(db: Session, user, payload):
         )
 
     # 2. Generate unique slug
-    base_slug = slugify(user.name)
+    base_slug = slugify(user.name) or "user"
     slug = base_slug
     counter = 1
 
@@ -36,7 +40,7 @@ async def create_profile(db: Session, user, payload):
         job_title=payload.job_title,
         company=payload.company,
         bio=payload.bio,
-        website=payload.website,
+        website=str(payload.website) if payload.website else None,
         linkedin=payload.linkedin,
         twitter=payload.twitter,
         facebook=payload.facebook,
@@ -63,8 +67,8 @@ async def update_profile(db: Session, user_id: str, payload):
         return None
 
     updated_fields = {}
-    if payload.display_name is not None:
-        profile.display_name = payload.display_name
+    if payload.display_name is not None and payload.display_name.strip():
+        profile.display_name = payload.display_name.strip()
 
     if payload.job_title is not None and payload.job_title != profile.job_title:
         updated_fields["Job Title"] = f"{profile.job_title or 'N/A'} → {payload.job_title}"
@@ -106,21 +110,23 @@ async def update_profile(db: Session, user_id: str, payload):
     # Notify contacts
     if updated_fields:
         try:
-            owners = await get_all_owners_for_profile(db, str(profile.id))
+            owners = get_all_owners_for_profile(db, profile.id)
             for record in owners:
+                if not record.owner or not record.owner.email:
+                    continue
                 message = "The contact you saved has updated information:\n\n"
                 for k, v in updated_fields.items():
                     message += f"- {k}: {v}\n"
 
-                message += f"\nView Profile: https://yourapp.com/u/{profile.slug}"
+                message += f"\nView Profile: {settings.public_profile_url(profile.slug)}"
 
                 send_email(
                     to=record.owner.email,
                     subject="Contact Updated!",
                     body=message,
                 )
-        except Exception as e:
-            print("Notification error:", e)
+        except Exception:
+            logger.exception("Contact update notification failed")
 
     return profile
 

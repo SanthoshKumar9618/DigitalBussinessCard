@@ -1,45 +1,39 @@
 # backend/app/utils/notification.py
+"""Outgoing email / SMS.
+
+No real provider is wired in yet (Render blocks SMTP), so these are mocks.
+OTP codes are only ever written to the log in development, never in production.
+"""
 import logging
+
 from app.config.settings import settings
 
-# ---------------- Email ----------------
-def send_email(to: str, subject: str, otp: str = None, body: str = None) -> bool:
-    """
-    Send email.
-    In production: use email provider (SendGrid / Resend).
-    On Render: SMTP is blocked, so we mock safely.
-    """
+logger = logging.getLogger(__name__)
 
-    if settings.ENVIRONMENT == "production":
-        # 🔴 SMTP is blocked on Render → use API provider later
-        logging.info(f"[EMAIL MOCK][PROD] To={to} | Subject={subject} | OTP={otp}")
-        return True
 
-    # 🟢 Local / dev mode
-    if otp:
-        logging.info(f"[EMAIL MOCK][DEV] To={to} | Subject={subject} | OTP={otp}")
-    elif body:
-        logging.info(f"[EMAIL MOCK][DEV] To={to} | Subject={subject} | Body={body}")
+def _is_dev() -> bool:
+    return settings.ENVIRONMENT.lower() != "production"
+
+
+def send_email(to: str, subject: str, body: str | None = None) -> bool:
+    if _is_dev():
+        logger.info("[EMAIL MOCK] To=%s | Subject=%s | Body=%s", to, subject, body)
     else:
-        logging.info(f"[EMAIL MOCK][DEV] To={to} | Subject={subject}")
-
+        logger.info("[EMAIL MOCK] To=%s | Subject=%s", to, subject)
     return True
 
 
-# ---------------- SMS ----------------
+def send_otp_email(to: str, otp: str) -> bool:
+    if _is_dev():
+        logger.info("[EMAIL MOCK][DEV] OTP for %s: %s", to, otp)
+    else:
+        logger.warning("[EMAIL MOCK] No email provider configured; OTP for %s was not delivered", to)
+    return True
+
+
 def send_sms(to_phone: str, message: str) -> bool:
-    logging.info(f"[SMS MOCK] To={to_phone} | Message={message}")
-    return True
-
-
-# ---------------- OTP Dispatcher ----------------
-def send_otp(email: str = None, phone: str = None, otp: str = None, background_tasks=None):
-    subject = "Your OTP Code"
-
-    if email:
-        send_email(email, subject, otp)
-
-    if phone:
-        send_sms(phone, f"Your OTP is {otp}")
-
+    if _is_dev():
+        logger.info("[SMS MOCK] To=%s | Message=%s", to_phone, message)
+    else:
+        logger.info("[SMS MOCK] To=%s", to_phone)
     return True

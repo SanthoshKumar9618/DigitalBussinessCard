@@ -1,3 +1,4 @@
+import { publicProfileUrl } from "../../services/api";
 import { useEffect, useState } from "react";
 import {
   View,
@@ -180,9 +181,7 @@ export default function TapScreen() {
               </Text>
 
               <QRCode
-                value={`https://yourapp.com/${
-                  connectedProfile?.slug || "me"
-                }`}
+                value={publicProfileUrl(connectedProfile?.slug || "me")}
                 size={160}
                 color="#000"
                 backgroundColor="#FFF"
@@ -191,9 +190,7 @@ export default function TapScreen() {
               <TouchableOpacity
                 onPress={() =>
                   Clipboard.setStringAsync(
-                    `https://yourapp.com/${
-                      connectedProfile?.slug || "me"
-                    }`
+                    publicProfileUrl(connectedProfile?.slug || "me")
                   )
                 }
               >
@@ -203,7 +200,7 @@ export default function TapScreen() {
                     { color: colors.primary },
                   ]}
                 >
-                  yourapp.com/{connectedProfile?.slug || "me"}
+                  {publicProfileUrl(connectedProfile?.slug || "me").replace(/^https?:\/\//, "")}
                 </Text>
               </TouchableOpacity>
 

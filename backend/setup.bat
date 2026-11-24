@@ -18,9 +18,9 @@ python --version
 echo.
 
 REM Check if virtual environment exists
-if not exist "venv\" (
+if not exist ".venv311\" (
     echo [2/4] Creating virtual environment...
-    python -m venv venv
+    python -m venv .venv311
     if errorlevel 1 (
         echo ERROR: Failed to create virtual environment
         pause

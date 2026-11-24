@@ -1,76 +1,45 @@
 # backend/app/services/auth_service.py
-import random
-import string
-from datetime import datetime, timedelta
-from app.utils import otp
-from app.utils.otp import hash_otp
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
+import logging
 
-from app.database.models import User, Profile, OTP
-from app.schemas.user_schema import Token as TokenSchema
 from passlib.context import CryptContext
-from jose import jwt, JWTError
-from app.utils.notification import send_email, send_sms
-from app.config.settings import settings
-from app.utils.otp import verify_otp as verify_hashed_otp
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
+from app.database.models import User
+from app.schemas.user_schema import Token as TokenSchema
+from app.utils.jwt_handler import create_access_token, create_refresh_token, decode_token, subject_to_uuid
+from app.utils.notification import send_otp_email
+from app.utils.otp import clear_user_otp, issue_user_otp, verify_user_otp
+
+logger = logging.getLogger(__name__)
 
 pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# env keys (match your .env)
-# env keys from pydantic Settings
-JWT_SECRET = settings.JWT_SECRET
-JWT_ALGORITHM = settings.JWT_ALGORITHM
-JWT_ACCESS_TOKEN_EXPIRE_MINUTES = settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES
-JWT_REFRESH_TOKEN_EXPIRE_DAYS = settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS
-
-
 
 # ----------------- Password Utilities -----------------
+def _truncate(pw: str) -> str:
+    # bcrypt only uses the first 72 bytes
+    return pw.encode("utf-8")[:72].decode("utf-8", errors="ignore")
+
+
 def _hash_password(pw: str) -> str:
-    """
-    Hash password with bcrypt, truncating to 72 bytes (bcrypt limit)
-    """
-    # Encode to bytes, truncate, decode safely
-    pw_truncated = pw.encode("utf-8")[:72].decode("utf-8", errors="ignore")
-    return pwd.hash(pw_truncated)
+    return pwd.hash(_truncate(pw))
 
 
 def _verify_password(plain: str, hashed: str) -> bool:
-    plain_truncated = plain.encode("utf-8")[:72].decode("utf-8", errors="ignore")
-    return pwd.verify(plain_truncated, hashed)
+    try:
+        return pwd.verify(_truncate(plain), hashed)
+    except (ValueError, TypeError):
+        return False
 
 
 # ----------------- JWT Utilities -----------------
-def _create_access_token(subject: str) -> str:
-    expire = datetime.utcnow() + timedelta(minutes=JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
-    payload = {"sub": str(subject), "exp": expire, "type": "access"}
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-
-
-def _create_refresh_token(subject: str) -> str:
-    expire = datetime.utcnow() + timedelta(days=JWT_REFRESH_TOKEN_EXPIRE_DAYS)
-    payload = {"sub": str(subject), "exp": expire, "type": "refresh"}
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-
-
-def _decode_token(token: str) -> dict:
-    try:
-        return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-    except JWTError:
-        return {}
-
-
-# ----------------- OTP Utilities -----------------
-def _generate_otp(length: int = 6) -> str:
-    return "".join(random.choices(string.digits, k=length))
-
-
-def _slug_from_name(name: str) -> str:
-    base = "-".join(name.strip().lower().split())
-    suffix = "".join(random.choices(string.ascii_lowercase + string.digits, k=3))
-    return f"{base}-{suffix}"
+def issue_tokens(user: User) -> TokenSchema:
+    return TokenSchema(
+        access_token=create_access_token(str(user.id)),
+        refresh_token=create_refresh_token(str(user.id)),
+        token_type="bearer",
+    )
 
 
 # ----------------- User Lookups -----------------
@@ -81,168 +50,87 @@ def get_user_by_email(db: Session, email: str):
 def get_user_by_phone(db: Session, phone: str):
     return db.query(User).filter(User.phone == phone.strip()).first()
 
-async def get_user_by_identifier(db: Session, identifier: str):
+
+def get_user_by_identifier(db: Session, identifier: str):
     """Get user by email or phone"""
-    user = db.query(User).filter(User.email == identifier.lower().strip()).first()
-    if user:
-        return user
-    return db.query(User).filter(User.phone == identifier.strip()).first()
+    return get_user_by_email(db, identifier) or get_user_by_phone(db, identifier)
 
 
 def register_user(db: Session, payload) -> User | None:
     try:
-        if get_user_by_email(db, payload.email):
+        if get_user_by_email(db, payload.email) or get_user_by_phone(db, payload.phone):
             return None
-        if get_user_by_phone(db, payload.phone):
-            return None
-
-        hashed = _hash_password(payload.password)
 
         user = User(
             name=payload.name.strip(),
             email=payload.email.lower().strip(),
             phone=payload.phone.strip(),
-            password_hash=hashed,
+            password_hash=_hash_password(payload.password),
             is_active=True,
             email_verified=False,
         )
-
         db.add(user)
         db.commit()
         db.refresh(user)
-
-        # ✅ USER ONLY — NO PROFILE HERE
         return user
-
-    except SQLAlchemyError as e:
+    except SQLAlchemyError:
         db.rollback()
-        print("Register error:", e)
+        logger.exception("Register failed")
         return None
-
 
 
 # ----------------- Authenticate -----------------
-async def authenticate_user(db: Session, identifier: str, password: str) -> TokenSchema | None:
-    user = await get_user_by_identifier(db, identifier)
-    if not user or not user.password_hash:
+def authenticate_user(db: Session, identifier: str, password: str) -> User | None:
+    """Return the user only if the password is correct."""
+    user = get_user_by_identifier(db, identifier)
+    if not user or not user.password_hash or not user.is_active:
         return None
-
     if not _verify_password(password, user.password_hash):
         return None
-
-    access = _create_access_token(str(user.id))
-    refresh = _create_refresh_token(str(user.id))
-    return TokenSchema(access_token=access, refresh_token=refresh, token_type="bearer")
+    return user
 
 
 # ----------------- Refresh Token -----------------
-async def refresh_access_token(db: Session, refresh_token: str) -> TokenSchema | None:
-    payload = _decode_token(refresh_token)
+def refresh_access_token(db: Session, refresh_token: str) -> TokenSchema | None:
+    payload = decode_token(refresh_token)
     if not payload or payload.get("type") != "refresh":
         return None
 
-    user_id = payload.get("sub")
-    user = db.query(User).get(user_id)
-    if not user:
+    user_id = subject_to_uuid(payload)
+    user = db.get(User, user_id) if user_id else None
+    if not user or not user.is_active:
         return None
-
-    access = _create_access_token(str(user.id))
-    refresh = _create_refresh_token(str(user.id))
-    return TokenSchema(access_token=access, refresh_token=refresh, token_type="bearer")
+    return issue_tokens(user)
 
 
-# ----------------- OTP Flows -----------------
-async def generate_and_send_otp(db: Session, identifier: str) -> bool:
-    user = await get_user_by_identifier(db, identifier)
+# ----------------- Password reset (OTP) -----------------
+def send_password_reset_otp(db: Session, identifier: str) -> None:
+    """Send a reset OTP to the account's email. Silent if the user is unknown,
+    so the endpoint can't be used to discover registered emails/phones."""
+    user = get_user_by_identifier(db, identifier)
     if not user:
-        return False
+        return
 
-    code = "".join(random.choices("0123456789", k=6))
-    expires_at = datetime.utcnow() + timedelta(minutes=10)
-
-    otp = OTP(
-        identifier=identifier,
-        code=code,              # ✅ plain text
-        expires_at=expires_at,
-        used=False
-    )
-
-    db.add(otp)
+    otp = issue_user_otp(user)
     db.commit()
-    db.refresh(otp)
-
-    sent = False
     try:
-        from app.utils.notification import send_email, send_sms
-    except ImportError:
-        def send_email(to, subject, body):
-            print("EMAIL:", to, subject, body)
-            return True
-
-        def send_sms(to, body):
-            print("SMS:", to, body)
-            return True
-
-    # Send OTP
-    if "@" in identifier:
-        try:
-            send_email(identifier, "OTP Verification", code)
-            sent = True
-        except Exception:
-            pass
-        if getattr(user, "phone", None):
-            try:
-                send_sms(user.phone, f"Your OTP is {code}. Expires in 10 minutes.")
-                sent = True
-            except Exception:
-                pass
-    else:
-        try:
-            send_sms(identifier, f"Your OTP is {code}. Expires in 10 minutes.")
-            sent = True
-        except Exception:
-            pass
-        if getattr(user, "email", None):
-            try:
-                send_email(user.email, "Your OTP", f"Your OTP is {code}. Expires in 10 minutes.")
-                sent = True
-            except Exception:
-                pass
-
-    return sent
+        send_otp_email(user.email, otp)
+    except Exception:
+        logger.exception("Password reset OTP send failed")
 
 
-async def verify_otp(db: Session, identifier: str, code: str) -> bool:
-    now = datetime.utcnow()
-
-    otp = db.query(OTP).filter(
-        OTP.identifier == identifier,
-        OTP.used == False,
-        OTP.expires_at >= now
-    ).order_by(OTP.created_at.desc()).first()
-
-    if not otp:
-        return False
-
-    if otp.code != code:
-        return False
-
-    otp.used = True
-    db.commit()
-    return True
-
-
-
-
-async def reset_password(db: Session, identifier: str, code: str, new_password: str) -> bool:
-    if not await verify_otp(db, identifier, code):
-        return False
-
-    user = await get_user_by_identifier(db, identifier)
+def reset_password(db: Session, identifier: str, code: str, new_password: str) -> bool:
+    user = get_user_by_identifier(db, identifier)
     if not user:
+        return False
+
+    if not verify_user_otp(user, code, via="email"):
+        db.commit()  # persist OTP burn after too many attempts
         return False
 
     user.password_hash = _hash_password(new_password)
+    # Receiving the OTP proves ownership of the email address.
+    user.email_verified = True
+    clear_user_otp(user, via="email")
     db.commit()
     return True
-

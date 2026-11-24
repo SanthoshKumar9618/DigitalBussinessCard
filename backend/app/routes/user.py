@@ -1,20 +1,49 @@
 # backend/app/routes/user.py
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
+
 from app.database.connection import get_db
+from app.database.models import User
 from app.utils.jwt_handler import get_current_user
+from app.utils.notification import send_otp_email
+from app.utils.otp import clear_user_otp, issue_user_otp, verify_user_otp
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/user", tags=["User"])
 
+
+class UserUpdate(BaseModel):
+    phone: str | None = None
+
+
+class EmailChangeRequest(BaseModel):
+    email: EmailStr
+
+
+class EmailChangeVerify(BaseModel):
+    email: EmailStr
+    otp: str
+
+
 @router.put("")
 def update_user(
-    payload: dict,
+    payload: UserUpdate,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    if "phone" in payload:
-        current_user.phone = payload["phone"]
-        current_user.phone_verified = False
+    if payload.phone is not None:
+        phone = payload.phone.strip() or None
+        if phone and phone != current_user.phone:
+            taken = db.query(User).filter(User.phone == phone, User.id != current_user.id).first()
+            if taken:
+                raise HTTPException(400, "Phone already in use")
+        if phone != current_user.phone:
+            current_user.phone = phone
+            current_user.phone_verified = False
 
     db.commit()
     return {"message": "User updated"}
@@ -22,51 +51,44 @@ def update_user(
 
 @router.post("/email/send-otp")
 def send_email_change_otp(
-    payload: dict,
+    payload: EmailChangeRequest,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    new_email = payload.get("email")
-    if not new_email:
-        raise HTTPException(400, "Email required")
-
-    # prevent duplicates
-    from app.database.models import User
+    new_email = payload.email.lower().strip()
+    if new_email == current_user.email:
+        raise HTTPException(400, "This is already your email")
     if db.query(User).filter(User.email == new_email).first():
         raise HTTPException(400, "Email already in use")
 
-    from app.utils.otp import generate_otp, hash_otp, otp_expiry_time
-    from app.utils.email import send_otp_email
-
-    otp = generate_otp()
-    current_user.email_otp = hash_otp(otp)
-    current_user.otp_expires_at = otp_expiry_time()
-    current_user.email_verified = False
-    current_user.email = new_email
-
+    # The account email is NOT changed yet. The OTP is bound to the new address
+    # and the change only happens once that OTP is verified.
+    otp = issue_user_otp(current_user, secret_suffix=":" + new_email)
     db.commit()
-    send_otp_email(new_email, otp)
+    try:
+        send_otp_email(new_email, otp)
+    except Exception:
+        logger.exception("Email-change OTP send failed")
 
     return {"message": "OTP sent to new email"}
 
 
 @router.post("/email/verify-otp")
 def verify_new_email(
-    payload: dict,
+    payload: EmailChangeVerify,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    from app.utils.otp import verify_user_otp, clear_user_otp
-
-    otp = payload.get("otp")
-    if not otp:
-        raise HTTPException(400, "OTP required")
-
-    if not verify_user_otp(current_user, otp, via="email"):
+    new_email = payload.email.lower().strip()
+    if not verify_user_otp(current_user, payload.otp, via="email", secret_suffix=":" + new_email):
+        db.commit()
         raise HTTPException(400, "Invalid or expired OTP")
 
+    if db.query(User).filter(User.email == new_email, User.id != current_user.id).first():
+        raise HTTPException(400, "Email already in use")
+
+    current_user.email = new_email
     current_user.email_verified = True
     clear_user_otp(current_user, via="email")
-
     db.commit()
     return {"message": "Email verified"}

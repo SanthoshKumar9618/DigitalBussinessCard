@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+import logging
 import os
 
 from app.routes import (
@@ -19,10 +20,14 @@ app = FastAPI(
     redoc_url=None,
 )
 
+logging.basicConfig(level=logging.INFO)
+
+# Auth uses bearer tokens, not cookies, so credentials are not needed.
+# (Browsers reject allow_origins="*" combined with credentials anyway.)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # production-safe for now
-    allow_credentials=True,
+    allow_origins=settings.cors_origins_list,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -209,7 +209,7 @@ const handleVerifyEmailOtp = async () => {
 
   try {
     setVerifying(true);
-    await verifyEmailOtp(otp);
+    await verifyEmailOtp(userForm.email, otp);
     setEmailVerified(true);
     setOtpSent(false);
     Alert.alert("Email verified");

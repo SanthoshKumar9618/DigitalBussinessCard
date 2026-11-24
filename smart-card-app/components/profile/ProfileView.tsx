@@ -15,7 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import QRCode from "react-native-qrcode-svg";
 import EditProfile from "./EditProfile";
-import { BASE_URL } from "../../services/api";
+import { BASE_URL, publicProfileUrl } from "../../services/api";
 import { useRouter } from "expo-router";
 import { useApp } from "../../components/context/AppContext";
 import SafeScreen from "../ui/Screen1";
@@ -44,21 +44,6 @@ export default function ProfileView({ profile, onRefresh }: any) {
     colors,
   } = useApp();
 
-if (!settings) {
-  return (
-    <SafeScreen>
-      <View
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
-        <Text>Loading Settings...</Text>
-      </View>
-    </SafeScreen>
-  );
-}
   /* ---------------- EFFECTS ---------------- */
 
   useEffect(() => {
@@ -91,6 +76,23 @@ if (!settings) {
     ).start();
   }, []);
 
+  // Early return must come after all hooks (rules of hooks).
+  if (!settings) {
+    return (
+      <SafeScreen>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <Text>Loading Settings...</Text>
+        </View>
+      </SafeScreen>
+    );
+  }
+
   /* ---------------- HELPERS ---------------- */
 
   const animatePress = () => {
@@ -121,7 +123,7 @@ if (!settings) {
 
   const shareProfile = async () => {
     await Share.share({
-      message: `Connect with me:\nhttps://yourapp.com/${profile.slug}`,
+      message: `Connect with me:\n${publicProfileUrl(profile.slug)}`,
     });
   };
 
@@ -372,7 +374,7 @@ if (!settings) {
             </Text>
 
             <QRCode
-              value={`https://yourapp.com/${profile.slug}`}
+              value={publicProfileUrl(profile.slug)}
               size={140}
               color="#000"
               backgroundColor="#FFF"
@@ -380,9 +382,7 @@ if (!settings) {
 
             <TouchableOpacity
               onPress={() =>
-                copyText(
-                  `https://yourapp.com/${profile.slug}`
-                )
+                copyText(publicProfileUrl(profile.slug))
               }
             >
               <Text
@@ -391,7 +391,7 @@ if (!settings) {
                   { color: colors.primary },
                 ]}
               >
-                yourapp.com/{profile.slug}
+                {publicProfileUrl(profile.slug).replace(/^https?:\/\//, "")}
               </Text>
             </TouchableOpacity>
 

@@ -1,9 +1,10 @@
+import { publicProfileUrl } from "../../services/api";
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Image } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function ShareModal({ visible, onClose, profile }: any) {
-  const profileUrl = `https://yourapp.com/${profile.slug}`;
+  const profileUrl = publicProfileUrl(profile.slug);
 
   const copyLink = async () => {
     await Clipboard.setStringAsync(profileUrl);

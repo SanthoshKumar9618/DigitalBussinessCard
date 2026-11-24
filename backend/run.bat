@@ -5,7 +5,7 @@ echo ========================================
 echo.
 
 REM Check if virtual environment exists
-if not exist "venv\" (
+if not exist ".venv311\" (
     echo ERROR: Virtual environment not found!
     echo Please run 'setup.bat' first to install dependencies
     echo.

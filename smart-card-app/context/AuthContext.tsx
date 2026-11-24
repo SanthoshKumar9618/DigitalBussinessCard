@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { logout } from "../services/authService";
+import { logout as logoutRequest } from "../services/authService";
 
 type AuthContextType = {
   token: string | null;
@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // ✅ LOGOUT (WITH BACKEND CALL – THIS IS WHAT YOU WANT)
   const logout = async () => {
     try {
-      await logout(); // optional backend invalidation
+      await logoutRequest(); // tell the backend before dropping the token
     } catch (e) {
       // backend token may already be expired – ignore
     } finally {

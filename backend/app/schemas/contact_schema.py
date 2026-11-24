@@ -8,7 +8,10 @@ class ContactCreate(BaseModel):
     source: Optional[str] = None   # nfc, qr, manual
     
 class ContactProfileOut(BaseModel):
-    avatar_url: Optional[str]
+    avatar_url: Optional[str] = None
+    display_name: Optional[str] = None
+    company: Optional[str] = None
+    job_title: Optional[str] = None
     
     class Config:
         from_attributes = True

@@ -1,62 +1,3 @@
-# from pydantic_settings import BaseSettings, SettingsConfigDict
-# from pydantic import AnyUrl, AnyHttpUrl, field_validator
-# from typing import List, Optional
-# from datetime import timedelta
-#
-# import os
-# print("RAW DATABASE_URL =", os.getenv("DATABASE_URL"))
-
-
-# class Settings(BaseSettings):
-
-#     PROJECT_NAME: str = "Digital Business Card API"
-#     ENVIRONMENT: str = "development"
-
-#     DATABASE_URL: AnyUrl
-
-    
-#     smtp_email: str
-#     smtp_password: str
-#     smtp_server: str = "smtp.gmail.com"
-#     smtp_port: int = 587
-
-#     JWT_SECRET: str
-#     JWT_ALGORITHM: str = "HS256"
-#     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080
-#     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 30
-#     BCRYPT_ROUNDS: int = 12
-
-#     USE_S3: bool = False
-#     S3_BUCKET_NAME: Optional[str] = None
-#     S3_REGION: Optional[str] = None
-#     S3_ACCESS_KEY_ID: Optional[str] = None
-#     S3_SECRET_ACCESS_KEY: Optional[str] = None
-#     S3_ENDPOINT_URL: Optional[str] = None
-
-#     REDIS_URL: Optional[str] = None
-#     SENTRY_DSN: Optional[str] = None
-#     APP_DOMAIN: str = "https://yourapp.com"
-    
-#     model_config = SettingsConfigDict(
-#         env_file=".env",
-#         env_file_encoding="utf-8",
-#         extra="ignore",   # <<< ADD THIS LINE
-#     )
-
-
-#     @property
-#     def jwt_access_expire(self) -> timedelta:
-#         return timedelta(minutes=self.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
-
-#     @property
-#     def jwt_refresh_expire(self) -> timedelta:
-#         return timedelta(days=self.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
-    
-#     
-
-# settings = Settings()
-
-
 from pydantic import PostgresDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -75,6 +16,11 @@ class Settings(BaseSettings):
     # ---------------- APP ----------------
     ENVIRONMENT: str = "development"
     APP_DOMAIN: str = "http://localhost:8000"
+    # Comma-separated list of allowed browser origins, or "*" for any.
+    CORS_ORIGINS: str = "*"
+
+    # ---------------- SOCIAL LOGIN ----------------
+    GOOGLE_CLIENT_ID: str | None = None
 
     # ---------------- EMAIL ----------------
     SMTP_SERVER: str
@@ -91,6 +37,12 @@ class Settings(BaseSettings):
     def DATABASE_URL(self) -> PostgresDsn:
         return self.POSTGRES_DSN
 
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
+    def public_profile_url(self, slug: str) -> str:
+        return f"{self.APP_DOMAIN.rstrip('/')}/public/view/{slug}"
+
 
 settings = Settings()
-
