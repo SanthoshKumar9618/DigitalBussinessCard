@@ -2,6 +2,7 @@
 import uuid
 from sqlalchemy import (
     Integer,
+    Date,
     Column,
     String,
     Boolean,
@@ -128,7 +129,8 @@ class Contact(Base):
 
     id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     owner_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    target_profile_id = Column(PG_UUID(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False)
+    # NULL for manual contacts (scanned paper cards, converted leads) with no SmartCard
+    target_profile_id = Column(PG_UUID(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"), nullable=True)
 
     # SNAPSHOT FIELDS
     saved_display_name = Column(String(255))
@@ -147,7 +149,14 @@ class Contact(Base):
 
     tag = Column(String(120))
     notes = Column(Text)
-    source = Column(String(80))  # qr | nfc | manual
+    source = Column(String(80))  # qr | nfc | manual | scan | lead
+    saved_address = Column(String(500))
+
+    # Where / when you met, and a follow-up reminder
+    met_at = Column(String(255))  # event or place, e.g. "TechSummit Bengaluru"
+    met_on = Column(Date)
+    follow_up_at = Column(DateTime(timezone=True))
+    follow_up_done = Column(Boolean, nullable=False, default=False, server_default="false")
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

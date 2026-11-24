@@ -88,11 +88,41 @@ The goal is that every scan turns into either a saved contact or a captured lead
   3. Add the service account as a user in the Wallet console.
   4. Set `GOOGLE_WALLET_ISSUER_ID` and `GOOGLE_WALLET_SA_KEY_PATH`.
 
-### Phase 3: Intelligence
-- **Paper-card scanner:** on-device OCR, then a pre-filled contact.
-- **AI follow-up drafts** after a meeting, written from the notes and tags.
-- **Smart reminders** ("Follow up with Priya. You met 3 days ago").
-- **Map of where you met people** (optional location stamp on save).
+### Phase 3: Intelligence (built)
+
+| # | Feature | Status |
+|---|---|---|
+| 3.1 | **Paper-card scanner**: photograph a card, Claude reads it into a form, you review it, then save it as a contact. It works for cards from people who don't use SmartCard. Without AI configured, the same form lets you type the details in. | ✅ Needs `ANTHROPIC_API_KEY` |
+| 3.2 | **AI follow-up drafts** for Email, WhatsApp or LinkedIn. They use your notes, where you met, the time since you met, your goal and a tone. You can edit the draft, then send it through the right app. | ✅ Needs `ANTHROPIC_API_KEY` |
+| 3.3 | **Follow-up reminders** (Tomorrow / 3 days / Next week / 2 weeks). The Network tab shows a "N follow-ups due" banner and filter. | ✅ In-app; push notifications need `expo-notifications` and a native rebuild |
+| 3.4 | **Where you met**: an event or place plus the date on every contact. You can search it, it's in the CSV export, and the AI uses it. | ✅ Map view needs `expo-location` and `react-native-maps` (native) |
+| 3.5 | **Lead → contact**: save a lead into your network in one tap | ✅ |
+| 3.6 | **Scan a QR code from a photo**, decoded on the device. Fixes audit item B10b. | ✅ |
+
+**How the AI is used (`backend/app/services/ai_service.py`)**
+- Model: `claude-opus-5-5` (change it with `AI_MODEL`).
+- Calls go through `client.beta.messages.create` with server-side refusal fallbacks (`fallbacks: "default"`).
+- Answers come back as structured JSON (`output_config.format` with a JSON schema), so they always parse.
+- Effort is `low` for reading cards and `medium` for drafts.
+- Refusals, cut-off answers and provider errors become clear 422/503 messages in the app.
+- Photos are auto-rotated and shrunk to 1568 px before upload, and the server never stores them.
+- Daily limits per user: 30 scans and 60 drafts (`AI_SCANS_PER_DAY` / `AI_DRAFTS_PER_DAY`).
+- Text on cards and in profiles is treated as data, never as instructions to the model.
+- Nothing is saved until the user confirms.
+
+**Phase 3 endpoints**
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/ai/status` | Whether the AI features are switched on |
+| POST | `/ai/scan-card` (multipart `file`) | Read a card photo and return the fields (saves nothing) |
+| POST | `/contacts/manual` | Save a contact that has no SmartCard |
+| GET | `/contacts/reminders?tz_offset=330` | Overdue / today / upcoming follow-ups in the user's local day |
+| PATCH | `/contacts/{id}` | Now also takes `met_at`, `met_on`, `follow_up_at` (null clears it) and `follow_up_done` |
+| POST | `/contacts/{id}/follow-up-draft` `{channel, tone, goal}` | Write an AI draft |
+| POST | `/leads/{id}/to-contact` | Save a lead as a contact |
+
+Migration `d2a7f5c3e9b1` makes `contacts.target_profile_id` nullable and adds `saved_address`, `met_at`, `met_on`, `follow_up_at` and `follow_up_done`. Existing contacts get `met_on` set to the day they were saved.
 
 ### Phase 4: Teams and monetization
 - Team accounts with brand-locked templates, an admin dashboard and central billing.

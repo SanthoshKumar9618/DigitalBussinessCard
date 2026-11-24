@@ -19,6 +19,7 @@ import { deleteContact } from "@/services/contactService";
 import { useRefresh } from "@/components/context/RefreshContext";
 import { BASE_URL } from "@/services/api";
 import { updateContactNotes } from "@/services/leadService";
+import { reminderIn } from "@/services/aiService";
 
 export default function ContactDetail() {
   const params = useLocalSearchParams();
@@ -33,21 +34,49 @@ export default function ContactDetail() {
 
   const [notes, setNotes] = useState<string>(data?.notes ?? "");
   const [tag, setTag] = useState<string>(data?.tag ?? "");
+  const [metAt, setMetAt] = useState<string>(data?.met_at ?? "");
+  const [followUpAt, setFollowUpAt] = useState<string | null>(
+    data?.follow_up_at && !data?.follow_up_done ? data.follow_up_at : null
+  );
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
-  const dirty = notes !== (data?.notes ?? "") || tag !== (data?.tag ?? "");
+  const dirty =
+    notes !== (data?.notes ?? "") || tag !== (data?.tag ?? "") || metAt !== (data?.met_at ?? "");
 
   if (!data) return null;
+
+  const setReminder = async (days: number | null) => {
+    const at = days === null ? null : reminderIn(days);
+    const prev = followUpAt;
+    setFollowUpAt(at);
+    try {
+      await updateContactNotes(data.id, { follow_up_at: at });
+      data.follow_up_at = at;
+      data.follow_up_done = false;
+      refreshContacts();
+    } catch {
+      setFollowUpAt(prev);
+      Alert.alert("Couldn't set reminder", "Please try again.");
+    }
+  };
+
+  const openFollowUp = () =>
+    router.push({
+      pathname: "/follow-up",
+      params: { contact: JSON.stringify({ ...data, notes, tag, met_at: metAt }) },
+    });
 
   const saveNotes = async () => {
     setSaving(true);
     try {
       const cleanTag = tag.trim().replace(/^#/, "");
-      const res = await updateContactNotes(data.id, { notes: notes.trim(), tag: cleanTag });
+      const res = await updateContactNotes(data.id, { notes: notes.trim(), tag: cleanTag, met_at: metAt.trim() });
       data.notes = res.data.notes ?? "";
       data.tag = res.data.tag ?? "";
+      data.met_at = res.data.met_at ?? "";
       setNotes(data.notes);
       setTag(data.tag);
+      setMetAt(data.met_at);
       setSavedAt(Date.now());
       refreshContacts();
     } catch {
@@ -207,6 +236,57 @@ export default function ContactDetail() {
 )}
 
 
+        {/* FOLLOW UP */}
+        <Text style={[styles.section, { color: colors.subText }]}>FOLLOW UP</Text>
+        <View style={[styles.box, { backgroundColor: colors.card }]}>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Ionicons name="alarm-outline" size={18} color={colors.primary} />
+            <Text style={{ color: colors.text, marginLeft: 8, flex: 1 }}>
+              {followUpAt ? `Reminder: ${formatWhen(followUpAt)}` : "No reminder set"}
+            </Text>
+            {followUpAt && (
+              <TouchableOpacity onPress={() => setReminder(null)} accessibilityLabel="Clear reminder">
+                <Ionicons name="close-circle" size={20} color={colors.subText} />
+              </TouchableOpacity>
+            )}
+          </View>
+          <View style={styles.chipRow}>
+            {[["Tomorrow", 1], ["In 3 days", 3], ["Next week", 7], ["In 2 weeks", 14]].map(([label, days]) => (
+              <TouchableOpacity
+                key={label as string}
+                onPress={() => setReminder(days as number)}
+                style={[styles.chip, { backgroundColor: colors.bg }]}
+              >
+                <Text style={{ color: colors.text, fontSize: 12, fontWeight: "600" }}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TouchableOpacity
+            onPress={openFollowUp}
+            style={[styles.saveBtn, { backgroundColor: colors.primary, flexDirection: "row" }]}
+            accessibilityRole="button"
+          >
+            <Ionicons name="sparkles-outline" size={16} color={colors.onPrimary} />
+            <Text style={{ color: colors.onPrimary, fontWeight: "700", fontSize: 15, marginLeft: 8 }}>
+              Write a follow-up
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* WHERE YOU MET */}
+        <Text style={[styles.section, { color: colors.subText }]}>
+          WHERE YOU MET{data.met_on ? ` · ${new Date(data.met_on + "T00:00:00").toLocaleDateString()}` : ""}
+        </Text>
+        <TextInput
+          value={metAt}
+          onChangeText={setMetAt}
+          placeholder="Event or place, e.g. TechSummit Bengaluru"
+          placeholderTextColor={colors.subText}
+          maxLength={255}
+          accessibilityLabel="Where you met"
+          style={[styles.box, styles.tagInput, { backgroundColor: colors.card, color: colors.text, marginTop: 0 }]}
+        />
+
         {/* NOTES & TAG (private to you) */}
         <Text style={[styles.section, { color: colors.subText }]}>
           NOTES · ONLY YOU SEE THIS
@@ -325,6 +405,8 @@ const styles = StyleSheet.create({
   box: { padding: 14, borderRadius: 14 },
   notesInput: { minHeight: 96, textAlignVertical: "top", fontSize: 15 },
   tagInput: { marginTop: 10, fontSize: 15 },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
+  chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
   saveBtn: { marginTop: 12, minHeight: 46, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   deleteButton: { flexDirection: "row", alignSelf: "center", alignItems: "center", backgroundColor: "#E53935", paddingHorizontal: 24, paddingVertical: 12, borderRadius: 14, marginTop: 32 },
   deleteButtonText: { color: "#FFF", fontSize: 15, fontWeight: "600", marginLeft: 8 },
@@ -353,3 +435,12 @@ socialText: {
 },
 
 });
+
+function formatWhen(iso: string) {
+  const d = new Date(iso);
+  const days = Math.round((new Date(d).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 86400000);
+  if (days < 0) return `overdue (${d.toLocaleDateString()})`;
+  if (days === 0) return "today";
+  if (days === 1) return "tomorrow";
+  return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+}

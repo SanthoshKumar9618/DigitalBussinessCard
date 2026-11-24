@@ -22,7 +22,8 @@ import SafeScreen from "@/components/ui/Screen1";
 import { useApp } from "@/components/context/AppContext";
 import { useCards } from "@/context/CardContext";
 import { getContacts, searchContacts } from "@/services/contactService";
-import { deleteLead, exportCsv, getLeads, Lead, markLeadRead, timeAgo } from "@/services/leadService";
+import { deleteLead, exportCsv, getLeads, Lead, leadToContact, markLeadRead, timeAgo } from "@/services/leadService";
+import { getReminders } from "@/services/aiService";
 import { assetUrl } from "@/services/api";
 import { HIT, Radius, Space, Type } from "@/constants/design";
 
@@ -43,6 +44,8 @@ export default function NetworkScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedLead, setExpandedLead] = useState<string | null>(null);
+  const [dueIds, setDueIds] = useState<Set<string>>(new Set());
+  const [dueOnly, setDueOnly] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
@@ -54,6 +57,9 @@ export default function NetworkScreen() {
       ]);
       setContacts(c);
       setLeads(l);
+      getReminders()
+        .then((r) => setDueIds(new Set([...r.overdue, ...r.today].map((x: any) => x.id))))
+        .catch(() => {});
     } catch {
       setError("Couldn't load your network. Check your connection.");
     } finally {
@@ -88,7 +94,9 @@ export default function NetworkScreen() {
     return Object.keys(count).sort((a, b) => count[b] - count[a]).slice(0, 8);
   }, [contacts]);
 
-  const visibleContacts = tagFilter ? contacts.filter((c) => c.tag === tagFilter) : contacts;
+  const visibleContacts = contacts.filter(
+    (c) => (!tagFilter || c.tag === tagFilter) && (!dueOnly || dueIds.has(c.id))
+  );
   const unread = leads.filter((l) => !l.is_read).length;
 
   const onExport = () => {
@@ -124,6 +132,16 @@ export default function NetworkScreen() {
         },
       },
     ]);
+
+  const saveLead = async (lead: Lead) => {
+    try {
+      await leadToContact(lead.id);
+      Alert.alert("Saved", `${lead.name} is now in your contacts.`);
+      load();
+    } catch {
+      Alert.alert("Couldn't save", "Please try again.");
+    }
+  };
 
   const renderLead = ({ item }: { item: Lead }) => {
     const open = expandedLead === item.id;
@@ -172,6 +190,7 @@ export default function NetworkScreen() {
             {!!item.phone && <ActionChip icon="call-outline" label="Call" onPress={() => Linking.openURL(`tel:${item.phone}`)} />}
             {!!digits && <ActionChip icon="logo-whatsapp" label="WhatsApp" onPress={() => Linking.openURL(`https://wa.me/${digits}`)} />}
             {!!item.email && <ActionChip icon="mail-outline" label="Email" onPress={() => Linking.openURL(`mailto:${item.email}`)} />}
+            <ActionChip icon="person-add-outline" label="Save to network" onPress={() => saveLead(item)} />
             <ActionChip icon="trash-outline" label="Delete" danger onPress={() => removeLead(item)} />
           </View>
         )}
@@ -212,6 +231,9 @@ export default function NetworkScreen() {
             </View>
           )}
         </View>
+        {dueIds.has(item.id) && (
+          <Ionicons name="alarm" size={16} color={colors.primary} style={{ marginRight: 6 }} accessibilityLabel="Follow-up due" />
+        )}
         <Ionicons name="chevron-forward" size={18} color={colors.subText} />
       </TouchableOpacity>
     );
@@ -240,7 +262,7 @@ export default function NetworkScreen() {
         cta="Share my card"
         onCta={() => router.push("/(tabs)/tap")}
       />
-    ) : search || tagFilter ? (
+    ) : search || tagFilter || dueOnly ? (
       <EmptyState icon="search-outline" title="No matches" body="Try a different name, company or tag." />
     ) : (
       <EmptyState
@@ -276,11 +298,30 @@ export default function NetworkScreen() {
         <View style={styles.header}>
           <Text style={[Type.title, { color: colors.text }]}>My Network</Text>
           <View style={styles.headerActions}>
+            <IconBtn icon="card-outline" label="Scan a paper business card" onPress={() => router.push("/scan-card")} color={colors.text} />
             <IconBtn icon="stats-chart-outline" label="Insights" onPress={() => router.push("/insights")} color={colors.text} />
             <IconBtn icon="download-outline" label={`Export ${segment} as CSV`} onPress={onExport} color={colors.text} />
             <IconBtn icon="book-outline" label="Open phone contacts" onPress={openPhoneContacts} color={colors.text} />
           </View>
         </View>
+
+        {/* FOLLOW-UPS DUE */}
+        {dueIds.size > 0 && (
+          <TouchableOpacity
+            onPress={() => { setSegment("contacts"); setDueOnly(!dueOnly); }}
+            accessibilityRole="button"
+            accessibilityState={{ selected: dueOnly }}
+            style={[styles.dueBanner, { backgroundColor: dueOnly ? colors.primary : colors.primarySoft }]}
+          >
+            <Ionicons name="alarm-outline" size={18} color={dueOnly ? colors.onPrimary : colors.primary} />
+            <Text style={{ flex: 1, marginLeft: 8, fontWeight: "600", color: dueOnly ? colors.onPrimary : colors.text }}>
+              {dueIds.size} follow-up{dueIds.size > 1 ? "s" : ""} due
+            </Text>
+            <Text style={{ color: dueOnly ? colors.onPrimary : colors.primary, fontWeight: "600", fontSize: 13 }}>
+              {dueOnly ? "Show all" : "Show"}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {/* SEGMENTED CONTROL */}
         <View style={[styles.segment, { backgroundColor: colors.card }]} accessibilityRole="tablist">
@@ -376,6 +417,7 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: "row" },
   iconBtn: { width: HIT, height: HIT, alignItems: "center", justifyContent: "center" },
 
+  dueBanner: { flexDirection: "row", alignItems: "center", borderRadius: Radius.card, paddingHorizontal: 14, minHeight: HIT, marginBottom: Space.md },
   segment: { flexDirection: "row", borderRadius: Radius.card, padding: 4, marginBottom: Space.md },
   segmentBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", minHeight: 38, borderRadius: Radius.card - 4 },
   segmentText: { fontSize: 14, fontWeight: "600" },

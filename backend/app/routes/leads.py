@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session
 from app.database.connection import get_db
 from app.database.models import Lead, Profile
 from app.services.cards import require_active_card
-from app.services import analytics_service
+from app.schemas.contact_schema import ContactManualCreate, ContactOut
+from app.services import analytics_service, contact_service
 from app.utils.exporters import build_csv
 from app.utils.jwt_handler import get_current_user
 
@@ -99,6 +100,25 @@ def update_lead(lead_id: UUID, payload: LeadUpdate, db: Session = Depends(get_db
     db.commit()
     db.refresh(lead)
     return _out(lead)
+
+
+@router.post("/leads/{lead_id}/to-contact", status_code=status.HTTP_201_CREATED)
+def lead_to_contact(lead_id: UUID, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """Save a lead into the user's network as a contact (keeps the lead, marks it read)."""
+    lead = _get_lead(db, user, lead_id)
+    contact = contact_service.add_manual_contact(db, user.id, ContactManualCreate(
+        name=lead.name,
+        email=lead.email,
+        phone=lead.phone,
+        whatsapp=lead.phone,
+        company=lead.company,
+        notes=lead.note,
+        met_on=lead.created_at.date() if lead.created_at else None,
+        source="lead",
+    ))
+    lead.is_read = True
+    db.commit()
+    return ContactOut.model_validate(contact)
 
 
 @router.delete("/leads/{lead_id}", status_code=status.HTTP_204_NO_CONTENT)

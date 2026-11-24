@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   Alert,
 } from "react-native";
-import { CameraView, useCameraPermissions } from "expo-camera";
+import { CameraView, scanFromURLAsync, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -120,22 +120,15 @@ export default function ScanScreen() {
 
     const image = result.assets[0];
 
-    const formData = new FormData();
-    formData.append("file", {
-      uri: image.uri,
-      name: "qr.jpg",
-      type: "image/jpeg",
-    } as any);
-
     try {
-      const res = await api.post("/qr/decode", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
+      // Decode the QR on the device (no upload needed).
+      const results = await scanFromURLAsync(image.uri, ["qr"]);
+      const data = results[0]?.data;
+      if (!data) throw new Error("no qr");
       setScanned(true);
-      resolveProfile(res.data.data);
+      await resolveProfile(data);
     } catch {
-      Alert.alert("Scan Failed", "No QR code found in image");
+      Alert.alert("No QR code found", "Try a sharper photo, or scan the code with the camera.");
     }
   };
 
@@ -185,6 +178,16 @@ export default function ScanScreen() {
             </Text>
           </TouchableOpacity>
         )}
+
+        {/* Paper business card (AI) */}
+        <TouchableOpacity
+          style={[styles.footerButton, { backgroundColor: colors.card, marginBottom: 0 }]}
+          onPress={() => router.push("/scan-card")}
+          accessibilityRole="button"
+        >
+          <Ionicons name="card-outline" size={18} color={colors.primary} />
+          <Text style={[styles.footerText, { color: colors.text }]}>Scan a paper card</Text>
+        </TouchableOpacity>
 
         {/* Scan from Gallery */}
         <TouchableOpacity

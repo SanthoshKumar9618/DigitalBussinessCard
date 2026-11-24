@@ -37,8 +37,17 @@ export const deleteLead = (id: string) => api.delete(`/leads/${id}`);
 export const getInsights = async (days = 7): Promise<InsightsSummary> =>
   (await api.get("/analytics/summary", { params: { days } })).data;
 
-export const updateContactNotes = (id: string, data: { notes?: string; tag?: string }) =>
-  api.patch(`/contacts/${id}`, data);
+export type ContactPatch = {
+  notes?: string;
+  tag?: string;
+  met_at?: string;
+  follow_up_at?: string | null;
+  follow_up_done?: boolean;
+};
+
+export const updateContactNotes = (id: string, data: ContactPatch) => api.patch(`/contacts/${id}`, data);
+
+export const leadToContact = async (id: string) => (await api.post(`/leads/${id}/to-contact`)).data;
 
 /** Download a CSV from the API and open the share sheet (Drive, Mail, Sheets…). */
 export async function exportCsv(kind: "contacts" | "leads") {

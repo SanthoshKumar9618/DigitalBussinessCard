@@ -32,6 +32,13 @@ class Settings(BaseSettings):
     SMTP_EMAIL: str | None = None
     SMTP_PASSWORD: str | None = None
 
+    # ---------------- AI (optional; Claude API) ----------------
+    # Paper-card scanning and follow-up drafts. Off until a key is set.
+    ANTHROPIC_API_KEY: str | None = None
+    AI_MODEL: str = "claude-opus-5-5"
+    AI_SCANS_PER_DAY: int = 30
+    AI_DRAFTS_PER_DAY: int = 60
+
     # ---------------- WALLET PASSES (optional) ----------------
     # Apple: Pass Type ID certificate + key (PEM) and Apple WWDR G4 cert (PEM)
     APPLE_PASS_TYPE_ID: str | None = None
