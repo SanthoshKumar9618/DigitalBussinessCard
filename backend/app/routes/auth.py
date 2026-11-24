@@ -21,6 +21,8 @@ from app.services import auth_service
 from app.utils.jwt_handler import get_current_user
 from app.utils.notification import send_otp_email
 from app.utils.otp import clear_user_otp, issue_user_otp, verify_user_otp
+from app.utils import rate_limit
+from app.utils.rate_limit import limit
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +38,7 @@ def _send_verification_otp(db: Session, user: User) -> None:
         logger.exception("OTP send failed")
 
 
-@router.post("/register", status_code=status.HTTP_201_CREATED)
+@router.post("/register", status_code=status.HTTP_201_CREATED, dependencies=[Depends(limit("register", 10, 3600))])
 def register(payload: UserCreate, db: Session = Depends(get_db)):
     existing_email = auth_service.get_user_by_email(db, payload.email)
     if existing_email:
@@ -56,8 +58,10 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
     return {"message": "OTP sent to email", "user_id": str(user.id)}
 
 
-@router.post("/login", response_model=Token)
+@router.post("/login", response_model=Token, dependencies=[Depends(limit("login-ip", 30, 300))])
 def login(payload: UserLogin, db: Session = Depends(get_db)):
+    # Also cap attempts per account, so a password can't be guessed from many IPs.
+    rate_limit.check_key("login-account", payload.identifier, 10, 300)
     # Check the password first so we don't reveal account status to strangers.
     user = auth_service.authenticate_user(db, payload.identifier, payload.password)
     if not user:
@@ -77,14 +81,15 @@ def refresh(payload: RefreshTokenRequest, db: Session = Depends(get_db)):
     return token
 
 
-@router.post("/forgot-password")
+@router.post("/forgot-password", dependencies=[Depends(limit("forgot-ip", 20, 3600))])
 def forgot_password(payload: ForgotPassword, db: Session = Depends(get_db)):
+    rate_limit.check_key("forgot-account", payload.identifier, 5, 900)
     auth_service.send_password_reset_otp(db, payload.identifier)
     # Same response whether or not the account exists (prevents enumeration).
     return {"message": "If an account exists, an OTP has been sent"}
 
 
-@router.post("/verify-otp")
+@router.post("/verify-otp", dependencies=[Depends(limit("otp-ip", 30, 900))])
 def verify_registration_otp(payload: VerifyOTP, db: Session = Depends(get_db)):
     user = auth_service.get_user_by_email(db, payload.identifier)
     if not user or not verify_user_otp(user, payload.otp, via="email"):
@@ -97,7 +102,7 @@ def verify_registration_otp(payload: VerifyOTP, db: Session = Depends(get_db)):
     return {"message": "Email verified successfully"}
 
 
-@router.post("/reset-password")
+@router.post("/reset-password", dependencies=[Depends(limit("otp-ip", 30, 900))])
 def reset_password(payload: ResetPassword, db: Session = Depends(get_db)):
     ok = auth_service.reset_password(db, payload.identifier, payload.otp, payload.password)
     if not ok:
@@ -111,7 +116,7 @@ def logout(current_user=Depends(get_current_user)):
     return {"detail": "Logged out successfully"}
 
 
-@router.post("/verify-email", response_model=Token)
+@router.post("/verify-email", response_model=Token, dependencies=[Depends(limit("otp-ip", 30, 900))])
 def verify_email(payload: VerifyEmail, db: Session = Depends(get_db)):
     user = db.get(User, payload.user_id)
     if not user or not verify_user_otp(user, payload.otp, via="email"):
@@ -126,8 +131,9 @@ def verify_email(payload: VerifyEmail, db: Session = Depends(get_db)):
     return auth_service.issue_tokens(user)
 
 
-@router.post("/resend-email-otp")
+@router.post("/resend-email-otp", dependencies=[Depends(limit("resend-ip", 20, 3600))])
 def resend_email_otp(payload: ResendEmailOTP, db: Session = Depends(get_db)):
+    rate_limit.check_key("resend-account", str(payload.user_id), 5, 900)
     user = db.get(User, payload.user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

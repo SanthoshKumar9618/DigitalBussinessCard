@@ -28,7 +28,7 @@ Legend: `[x]` fixed in code · `[ ]` open · **(YOU)** = needs your action or de
 - [x] **S11 Avatar upload had no size limit and no content check** (only the extension was checked). Now capped at 5 MB and the file must be a real image.
 - [x] **S12 Login revealed whether an account exists:** "Email not verified" came back before the password check.
 - [x] **S13 Refresh token was sent in the URL query string**, so it ends up in access logs. Now sent in the JSON body.
-- [ ] **S14 (YOU) No rate limiting on auth endpoints** (login, register, forgot-password). Put it behind Render/Cloudflare rate limits or add `slowapi`.
+- [x] **S14 No rate limiting on auth endpoints** (fixed in Phase 4: per-IP and per-account limits) (login, register, forgot-password). Put it behind Render/Cloudflare rate limits or add `slowapi`.
 - [ ] **S15 (YOU) Tokens last 7 days and logout doesn't revoke them.** Consider shorter access tokens plus refresh in the app.
 
 ## 🟠 High — Bugs / crashes
@@ -50,7 +50,7 @@ Legend: `[x]` fixed in code · `[ ]` open · **(YOU)** = needs your action or de
 - [x] **B9 Every shared link and QR code pointed to the placeholder `https://yourapp.com/...`.** There's now one `PUBLIC_PROFILE_URL` helper; by default it points to the backend's `/public/view/{slug}` page.
   - [ ] **(YOU)** Swap in your real domain once the web app is deployed.
 - [x] **B10 The contact detail screen called `GET /contacts/{id}`, which didn't exist.** Endpoint added.
-  - [ ] **B10b** `POST /qr/decode` (scan a QR from the gallery) doesn't exist either. Adding it needs a native decoder library (pyzbar/zbar) on the server, or decoding on the device.
+  - [x] **B10b** (fixed in Phase 3: decoded on the device) `POST /qr/decode` (scan a QR from the gallery) doesn't exist either. Adding it needs a native decoder library (pyzbar/zbar) on the server, or decoding on the device.
 - [x] **B11 Contact-update notifications never ran:** a sync function was `await`ed. The link also used `yourapp.com`.
 - [x] **B12 Changing to a phone number another user already has caused a 500 error.**
 - [x] **B13 The web app's API URL was hardcoded to a LAN IP** (`192.168.68.106`), and a 404 rendered a blank profile. Now uses `VITE_API_BASE_URL` and shows "not found".
@@ -58,7 +58,7 @@ Legend: `[x]` fixed in code · `[ ]` open · **(YOU)** = needs your action or de
 - [x] **B16 (found while fixing) "Resend OTP" always failed with 422.** The backend expected `user_id` as a query param; the app sends JSON.
 - [x] **B17 (found while fixing) Creating a profile with a website crashed.** A Pydantic `HttpUrl` object was passed straight to the DB.
 - [x] **B18 (found while fixing) `ProfileView.tsx` called hooks after an early return** (rules of hooks). The profile screen could crash with "Rendered more hooks than during the previous render" once settings finished loading.
-- [ ] **B15 (YOU) Emails and SMS are never actually sent.** `send_email` and `send_otp_email` are mocks, so in production users **cannot get their OTP and cannot finish registering**. Pick a provider (Resend / SendGrid / Brevo over HTTPS, since Render blocks SMTP) and I'll wire it in.
+- [x] **B15 Emails are now sent through Resend once `RESEND_API_KEY` is set (Phase 2). SMS still has no provider.** Originally: emails and SMS were never actually sent. `send_email` and `send_otp_email` are mocks, so in production users **cannot get their OTP and cannot finish registering**. Pick a provider (Resend / SendGrid / Brevo over HTTPS, since Render blocks SMTP) and I'll wire it in.
 
 ## 🟡 Medium — Hygiene / maintainability
 
@@ -75,8 +75,8 @@ Legend: `[x]` fixed in code · `[ ]` open · **(YOU)** = needs your action or de
 - [x] **H6 `run.bat` checked for `venv\` but activated `.venv311\`.**
 - [x] **H7 `print()` debugging scattered through the backend.** Replaced with `logging`.
 - [x] **H8 `datetime.utcnow()` mixed with timezone-aware DB columns.**
-- [ ] **H9 No automated tests** for the backend or either frontend.
-- [ ] **H10 (YOU) `app.json` cleanup:**
+- [x] **H9 No automated tests** (fixed in Phase 4: `backend/tests` plus GitHub Actions CI) for the backend or either frontend.
+- [ ] **H10 (YOU) `app.json` cleanup:** (RECORD_AUDIO removed in Phase 4; the package id and deep-link host still need your real values)
   - The package id is `com.anonymous.smartcardapp`.
   - It asks for `RECORD_AUDIO` but never uses it.
   - The deep-link host is `yourapp.com`.

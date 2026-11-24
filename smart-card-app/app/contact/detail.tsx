@@ -20,6 +20,7 @@ import { useRefresh } from "@/components/context/RefreshContext";
 import { BASE_URL } from "@/services/api";
 import { updateContactNotes } from "@/services/leadService";
 import { reminderIn } from "@/services/aiService";
+import { scheduleReminder } from "@/services/reminderNotifications";
 
 export default function ContactDetail() {
   const params = useLocalSearchParams();
@@ -53,6 +54,7 @@ export default function ContactDetail() {
       await updateContactNotes(data.id, { follow_up_at: at });
       data.follow_up_at = at;
       data.follow_up_done = false;
+      scheduleReminder(data.id, data.saved_display_name || "", at);
       refreshContacts();
     } catch {
       setFollowUpAt(prev);

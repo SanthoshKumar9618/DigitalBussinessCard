@@ -1,4 +1,6 @@
-import { Stack } from "expo-router";
+import { useEffect } from "react";
+import { Stack, useRouter } from "expo-router";
+import { listenForReminderTaps } from "../services/reminderNotifications";
 import { View } from "react-native";
 import { AuthProvider } from "../context/AuthContext";
 import { CardProvider } from "../context/CardContext";
@@ -19,6 +21,12 @@ function ThemedBackground({ children }: { children: React.ReactNode }) {
   return <View style={{ flex: 1, backgroundColor: colors.bg }}>{children}</View>;
 }
 
+function ReminderTapHandler() {
+  const router = useRouter();
+  useEffect(() => listenForReminderTaps((path) => router.push(path as any)), [router]);
+  return null;
+}
+
 export default function RootLayout() {
   return (
     <AuthProvider>
@@ -28,6 +36,7 @@ export default function RootLayout() {
           <GestureHandlerRootView style={{ flex: 1 }}>
             <ThemedBackground>
               <Stack screenOptions={{ headerShown: false }} />
+              <ReminderTapHandler />
             </ThemedBackground>
           </GestureHandlerRootView>
         </AppProvider>

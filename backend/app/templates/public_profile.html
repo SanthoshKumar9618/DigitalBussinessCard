@@ -77,10 +77,21 @@
     footer { text-align: center; color: var(--sub); font-size: 12px; margin-top: 24px; }
     footer a { color: var(--gold); text-decoration: none; }
   </style>
+  {% if brand_css %}
+  <style>
+    :root { --gold: {{ brand_css.color }}; --gold-soft: {{ brand_css.soft }}; }
+    @media (prefers-color-scheme: light) { :root { --gold: {{ brand_css.color }}; --gold-soft: {{ brand_css.soft }}; } }
+  </style>
+  {% endif %}
+  <style>
+    .brand-logo { display: block; max-height: 40px; max-width: 160px; margin: 0 auto; padding-top: 20px; object-fit: contain; }
+  </style>
 </head>
 <body>
   <main class="wrap">
-    <div class="hero" aria-hidden="true"></div>
+    <div class="hero" aria-hidden="true">
+      {% if brand and brand.logo_url %}<img class="brand-logo" src="{{ brand.logo_url }}" alt="">{% endif %}
+    </div>
 
     <section class="card" aria-labelledby="name">
       {% if avatar %}

@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from app.config.settings import settings
-from app.services import ai_service
+from app.services import ai_service, plans
 from app.utils import rate_limit
 from app.utils.jwt_handler import get_current_user
 
@@ -26,7 +26,8 @@ async def scan_card(file: UploadFile = File(...), user=Depends(get_current_user)
     data = await file.read(MAX_SCAN_BYTES + 1)
     if len(data) > MAX_SCAN_BYTES:
         raise HTTPException(status_code=413, detail="Photo too large (max 8 MB).")
-    rate_limit.check(f"ai-scan:{user.id}", settings.AI_SCANS_PER_DAY, 86400)
+    per_day = min(settings.AI_SCANS_PER_DAY, plans.plan_for(user).ai_scans_per_day)
+    rate_limit.check(f"ai-scan:{user.id}", per_day, 86400)
     try:
         return ai_service.extract_business_card(data)
     except ai_service.AIRejected as e:

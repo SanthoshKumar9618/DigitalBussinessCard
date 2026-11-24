@@ -9,7 +9,8 @@ import {
   Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getPlan } from "@/services/integrationsService";
 import { logout } from "../../services/authService";
 import { useRouter } from "expo-router";
 import { useApp } from "../../components/context/AppContext";
@@ -20,6 +21,10 @@ import SafeScreen from "@/components/ui/Screen1";
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const [planName, setPlanName] = useState<string | null>(null);
+  useEffect(() => {
+    getPlan().then((p) => setPlanName(p.plan.name)).catch(() => {});
+  }, []);
 
   const {
     settings,
@@ -93,6 +98,20 @@ export default function SettingsScreen() {
             value={settings.show_email}
             onChange={(v: boolean) => updateSetting("show_email", v)}
             colors={colors}
+          />
+        </SettingsSection>
+
+        {/* BUSINESS */}
+        <SettingsSection title={planName ? `Business · ${planName} plan` : "Business"} colors={colors}>
+          <SettingsRow
+            label="Team (members, branding, leaderboard)"
+            colors={colors}
+            onPress={() => router.push("/team")}
+          />
+          <SettingsRow
+            label="Integrations (HubSpot, Zapier, webhooks)"
+            colors={colors}
+            onPress={() => router.push("/integrations")}
           />
         </SettingsSection>
 

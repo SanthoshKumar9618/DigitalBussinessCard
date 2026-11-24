@@ -50,6 +50,9 @@ class User(Base):
 
     is_active = Column(Boolean, default=True)
 
+    # Plan: free | pro | team. NULL = settings.DEFAULT_PLAN (billing not live yet)
+    plan = Column(String(length=20), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(
         DateTime(timezone=True),
@@ -346,4 +349,75 @@ class SlugAlias(Base):
 
     slug = Column(String(140), primary_key=True)
     profile_id = Column(PG_UUID(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+
+# -------------------- Teams --------------------
+class Team(Base):
+    __tablename__ = "teams"
+
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(120), nullable=False)
+    owner_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    plan = Column(String(20), nullable=False, default="team", server_default="team")
+
+    # Branding shown on every member's public card
+    brand_company = Column(String(255), nullable=True)
+    brand_logo_url = Column(String(1024), nullable=True)
+    brand_color = Column(String(9), nullable=True)  # "#RRGGBB"
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    members = relationship("TeamMember", back_populates="team", cascade="all, delete-orphan")
+
+
+class TeamMember(Base):
+    __tablename__ = "team_members"
+    __table_args__ = (UniqueConstraint("team_id", "email", name="uq_team_members_team_email"),)
+
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    team_id = Column(PG_UUID(as_uuid=True), ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    email = Column(String(255), nullable=False)
+    role = Column(String(20), nullable=False, default="member")      # owner | admin | member
+    status = Column(String(20), nullable=False, default="invited")   # invited | active
+    invite_token_hash = Column(String(64), nullable=True, unique=True)
+    invited_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    joined_at = Column(DateTime(timezone=True), nullable=True)
+
+    team = relationship("Team", back_populates="members")
+    user = relationship("User", foreign_keys=[user_id])
+
+
+# -------------------- Integrations --------------------
+class Webhook(Base):
+    """Outgoing webhooks (Zapier, Make, n8n, your own server)."""
+    __tablename__ = "webhooks"
+
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    url = Column(String(1024), nullable=False)
+    secret = Column(String(64), nullable=False)
+    events = Column(JSON, nullable=False)  # ["lead.created", "contact.saved"]
+    active = Column(Boolean, nullable=False, default=True, server_default="true")
+    last_status = Column(String(40), nullable=True)
+    last_delivery_at = Column(DateTime(timezone=True), nullable=True)
+    failure_count = Column(Integer, nullable=False, default=0, server_default="0")
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class Integration(Base):
+    """Connected CRMs (HubSpot). Tokens are stored encrypted."""
+    __tablename__ = "integrations"
+    __table_args__ = (UniqueConstraint("user_id", "provider", name="uq_integrations_user_provider"),)
+
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    provider = Column(String(30), nullable=False)
+    access_token_enc = Column(Text, nullable=False)
+    auto_sync = Column(Boolean, nullable=False, default=True, server_default="true")
+    last_sync_at = Column(DateTime(timezone=True), nullable=True)
+    last_sync_count = Column(Integer, nullable=True)
+    last_error = Column(String(500), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

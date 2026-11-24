@@ -5,8 +5,7 @@
       "package": "com.anonymous.smartcardapp",
       "permissions": [
         "android.permission.NFC",
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.CAMERA"
       ],
       "intentFilters": [
         {
@@ -30,9 +29,16 @@
       "bundleIdentifier": "com.anonymous.smartcardapp"
     },
     "plugins": [
-      "expo-camera",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow SmartCard to use the camera to scan QR codes and business cards.",
+          "recordAudioAndroid": false
+        }
+      ],
       "expo-image-picker",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-notifications"
     ],
     "extra": {
       "eas": {

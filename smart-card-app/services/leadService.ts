@@ -50,8 +50,13 @@ export const updateContactNotes = (id: string, data: ContactPatch) => api.patch(
 export const leadToContact = async (id: string) => (await api.post(`/leads/${id}/to-contact`)).data;
 
 /** Download a CSV from the API and open the share sheet (Drive, Mail, Sheets…). */
-export async function exportCsv(kind: "contacts" | "leads") {
-  const res = await api.get(`/${kind}/export.csv`, { responseType: "text" });
+export function exportCsv(kind: "contacts" | "leads") {
+  return exportCsvFrom(`/${kind}/export.csv`, kind);
+}
+
+/** Download any CSV endpoint and open the share sheet. */
+export async function exportCsvFrom(path: string, kind: string) {
+  const res = await api.get(path, { responseType: "text" });
   const uri = `${FileSystem.cacheDirectory}smartcard-${kind}-${Date.now()}.csv`;
   await FileSystem.writeAsStringAsync(uri, String(res.data));
   if (!(await Sharing.isAvailableAsync())) {

@@ -33,3 +33,19 @@ def check(key: str, limit: int, window_seconds: int) -> None:
         if len(_hits) > 10_000:  # keep memory bounded
             for k in [k for k, v in _hits.items() if not v][:5_000]:
                 _hits.pop(k, None)
+
+
+def limit(name: str, limit: int, window_seconds: int):
+    """FastAPI dependency: at most `limit` calls per client IP per window."""
+    def _dep(request: Request) -> None:
+        from app.config.settings import settings
+        if settings.RATE_LIMITS_ENABLED:
+            check(f"{name}:{client_ip(request)}", limit, window_seconds)
+    return _dep
+
+
+def check_key(name: str, key: str, limit: int, window_seconds: int) -> None:
+    """Limit by an arbitrary key (e.g. the email being attacked), across all IPs."""
+    from app.config.settings import settings
+    if settings.RATE_LIMITS_ENABLED and key:
+        check(f"{name}:{key.strip().lower()}", limit, window_seconds)

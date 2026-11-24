@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session
 from app.config.settings import settings
 from app.database.connection import get_db
 from app.database.models import Contact, NFCLink, Profile, ProfileCardSettings, ProfileLink, SlugAlias
-from app.services.cards import MAX_CARDS, card_email, card_phone
+from app.services import plans
+from app.services.cards import card_email, card_phone
 from app.services.profile_service import unique_slug
 from app.utils.jwt_handler import get_current_user
 
@@ -99,8 +100,12 @@ def create_card(payload: CardCreate, db: Session = Depends(get_db), user=Depends
     cards = user.profiles
     if not cards:
         raise HTTPException(status_code=400, detail="Create your profile first")
-    if len(cards) >= MAX_CARDS:
-        raise HTTPException(status_code=400, detail=f"You can have up to {MAX_CARDS} cards.")
+    max_cards = plans.plan_for(user).max_cards
+    if len(cards) >= max_cards:
+        raise HTTPException(
+            status_code=403 if max_cards == 1 else 400,
+            detail=f"Your plan allows up to {max_cards} card{'s' if max_cards > 1 else ''}.",
+        )
     if any(c.label.lower() == payload.label.lower() for c in cards):
         raise HTTPException(status_code=400, detail="You already have a card with that name.")
 

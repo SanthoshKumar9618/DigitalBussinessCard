@@ -10,6 +10,7 @@ from app.database.models import User
 from app.utils.jwt_handler import get_current_user
 from app.utils.notification import send_otp_email
 from app.utils.otp import clear_user_otp, issue_user_otp, verify_user_otp
+from app.services import plans
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,19 @@ class EmailChangeRequest(BaseModel):
 class EmailChangeVerify(BaseModel):
     email: EmailStr
     otp: str
+
+
+@router.get("/plan")
+def my_plan(current_user=Depends(get_current_user)):
+    """The user's plan and its limits (billing isn't live yet)."""
+    plan = plans.plan_for(current_user)
+    return {
+        "plan": plans.plan_dict(plan),
+        "usage": {
+            "cards": len(current_user.profiles),
+        },
+        "billing_enabled": False,
+    }
 
 
 @router.put("")

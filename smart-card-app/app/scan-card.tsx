@@ -21,6 +21,7 @@ import { useApp } from "@/components/context/AppContext";
 import { useRefresh } from "@/components/context/RefreshContext";
 import { getAiStatus, ManualContact, reminderIn, saveManualContact, scanCard } from "@/services/aiService";
 import { updateContactNotes } from "@/services/leadService";
+import { scheduleReminder } from "@/services/reminderNotifications";
 import { apiError } from "@/services/shareKitService";
 import { HIT, Radius, Space, Type } from "@/constants/design";
 
@@ -104,7 +105,9 @@ export default function ScanCardScreen() {
       const notes = [form.notes, extraNote].filter(Boolean).join("\n");
       const contact = await saveManualContact({ ...form, notes, source: form.source ?? "manual" });
       if (remindDays > 0) {
-        await updateContactNotes(contact.id, { follow_up_at: reminderIn(remindDays) });
+        const at = reminderIn(remindDays);
+        await updateContactNotes(contact.id, { follow_up_at: at });
+        scheduleReminder(contact.id, form.name, at);
       }
       refreshContacts?.();
       Alert.alert("Saved", `${form.name} is in your network.`, [

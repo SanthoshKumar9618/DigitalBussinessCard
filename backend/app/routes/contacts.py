@@ -11,7 +11,7 @@ from app.schemas.contact_schema import (
     ContactCreate, ContactManualCreate, ContactOut, ContactUpdate,
     FollowUpDraftIn, FollowUpDraftOut, RemindersOut,
 )
-from app.services import ai_service
+from app.services import ai_service, events, plans
 from app.services.cards import get_active_card
 from app.utils import rate_limit
 from app.utils.exporters import build_csv
@@ -33,6 +33,7 @@ def save_contact(
     contact = contact_service.add_contact(db, current_user.id, payload)
     if not contact:
         raise HTTPException(status_code=404, detail="Profile not found")
+    events.emit(db, current_user.id, "contact.saved", events.contact_data(contact))
     return contact
 
 
@@ -71,7 +72,9 @@ def save_manual_contact(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    return contact_service.add_manual_contact(db, current_user.id, payload)
+    contact = contact_service.add_manual_contact(db, current_user.id, payload)
+    events.emit(db, current_user.id, "contact.saved", events.contact_data(contact))
+    return contact
 
 
 # -----------------------------
@@ -155,7 +158,8 @@ def follow_up_draft(
         raise HTTPException(status_code=404, detail="Contact not found")
     if not ai_service.ai_enabled():
         raise HTTPException(status_code=503, detail="AI drafts aren't available yet.")
-    rate_limit.check(f"ai-draft:{current_user.id}", settings.AI_DRAFTS_PER_DAY, 86400)
+    per_day = min(settings.AI_DRAFTS_PER_DAY, plans.plan_for(current_user).ai_drafts_per_day)
+    rate_limit.check(f"ai-draft:{current_user.id}", per_day, 86400)
 
     sender = {
         "name": (card.display_name if card else None) or current_user.name,

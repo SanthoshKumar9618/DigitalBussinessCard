@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.config.settings import settings
 from app.database.connection import get_db
 from app.database.models import Lead, Profile, ProfileLink, SlugAlias
-from app.services import analytics_service, wallet_service
+from app.services import analytics_service, events, wallet_service
 from app.services.cards import card_email, card_phone
 from app.services.visibility import get_visibility
 from app.utils import rate_limit
@@ -228,12 +228,16 @@ def submit_lead(
     if email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
         return fail("email")
 
-    db.add(Lead(
+    lead = Lead(
         profile_id=profile.id, name=name, email=email, phone=phone,
         company=company, note=note, source=source,
-    ))
+    )
+    db.add(lead)
     analytics_service.log_event(db, profile.id, "lead_submitted", source, commit=False)
     db.commit()
+
+    db.refresh(lead)
+    events.emit(db, profile.user_id, "lead.created", events.lead_data(lead, profile))
 
     owner = profile.user
     if owner and owner.email and owner.email_verified:
@@ -290,6 +294,15 @@ def public_view(
     for link in _custom_links(db, profile.id):
         links.append({"href": link["url"], "label": link["label"], "icon": ICONS["link"]})
 
+    from app.routes.teams import team_brand  # local import avoids a cycle
+    brand = team_brand(db, profile.user_id)
+    if brand and not data["company"] and brand["company"]:
+        data["company"] = brand["company"]
+    brand_css = None
+    if brand and brand["color"]:
+        r, g, b = (int(brand["color"][i:i + 2], 16) for i in (1, 3, 5))
+        brand_css = {"color": brand["color"], "soft": f"rgba({r},{g},{b},.14)"}
+
     name = data["display_name"] or "Contact"
     initials = "".join(w[0] for w in name.split()[:2]).upper() or "?"
     subtitle = " · ".join(x for x in (data["job_title"], data["company"]) if x)
@@ -312,6 +325,8 @@ def public_view(
             "sent": bool(sent),
             "error": LEAD_ERRORS.get(error or ""),
             "home_url": settings.APP_DOMAIN,
+            "brand": brand,
+            "brand_css": brand_css,
             "wallet_apple_url": f"/public/{quote(profile.slug)}/wallet/apple" if wallet_service.apple_enabled() else None,
             "wallet_google_url": f"/public/{quote(profile.slug)}/wallet/google" if wallet_service.google_enabled() else None,
         },

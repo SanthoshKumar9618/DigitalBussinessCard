@@ -20,6 +20,7 @@ import SafeScreen from "@/components/ui/Screen1";
 import { useApp } from "@/components/context/AppContext";
 import { Channel, draftFollowUp, getAiStatus } from "@/services/aiService";
 import { updateContactNotes } from "@/services/leadService";
+import { cancelReminder } from "@/services/reminderNotifications";
 import { apiError } from "@/services/shareKitService";
 import { HIT, Radius, Space, Type } from "@/constants/design";
 
@@ -74,6 +75,7 @@ export default function FollowUpScreen() {
           text: "Mark done",
           onPress: async () => {
             await updateContactNotes(contact.id, { follow_up_done: true }).catch(() => {});
+            cancelReminder(contact.id);
             router.back();
           },
         },

@@ -124,10 +124,37 @@ The goal is that every scan turns into either a saved contact or a captured lead
 
 Migration `d2a7f5c3e9b1` makes `contacts.target_profile_id` nullable and adds `saved_address`, `met_at`, `met_on`, `follow_up_at` and `follow_up_done`. Existing contacts get `met_on` set to the day they were saved.
 
-### Phase 4: Teams and monetization
-- Team accounts with brand-locked templates, an admin dashboard and central billing.
-- CRM sync (HubSpot first; it has the friendliest API), plus Zapier/webhooks.
-- **Pricing idea:** Free (1 card, unlimited shares and leads, basic insights). Pro, about ₹199/month (multiple cards, wallet pass, full insights, CSV/CRM, no branding). Teams per seat.
+### Phase 4: Teams, integrations and plans (built; billing deliberately not connected)
+
+| # | Feature | Status |
+|---|---|---|
+| 4.1 | **Teams**: one team per user. Admins invite by email; an invite can only be accepted by that email address, is single-use and expires after 14 days. Roles are owner, admin and member. | ✅ |
+| 4.2 | **Team branding** on every member's public card: logo, accent colour, and the company name when a card has none | ✅ |
+| 4.3 | **Team dashboard**: 30-day leaderboard of views and leads per member, plus a CSV export of all the team's leads | ✅ |
+| 4.4 | **Webhooks** for Zapier, Make, n8n or your own server. Events are `lead.created` and `contact.saved`. Deliveries are HMAC-signed and retried 3 times, then paused after 20 failures. Private or internal addresses are blocked (SSRF protection). | ✅ |
+| 4.5 | **HubSpot CRM sync** using a Private App token (stored encrypted). New leads and contacts are pushed automatically, plus a "sync everything" button. Contacts are upserted by email, so there are no duplicates. | ✅ |
+| 4.6 | **Plans and limits** (Free / Pro / Team) in one place (`services/plans.py`): cards, links, AI quotas, insights range, webhooks, CRM and teams. Team members inherit the team's plan. | ✅ Everyone is on the Team plan until billing exists |
+| 4.7 | **Push reminders**: follow-up reminders fire as phone notifications (local, no push server) | ✅ Needs a new native build |
+| 4.8 | **Brute-force limits** on login (per IP and per account), OTP, register, forgot-password and resend | ✅ |
+| 4.9 | **Automated tests + CI**: `backend/tests` (201 end-to-end checks) and GitHub Actions running pytest plus type-checks for the app and web | ✅ |
+| 4.10 | Billing (Razorpay/Stripe) | ⏸ Skipped by decision. Set `DEFAULT_PLAN=free` when it's added. |
+
+**Webhook format.** Each delivery is an HTTP `POST` with a JSON body: `{"id": "evt_…", "type": "lead.created", "created_at": "…", "data": {…}}`. The headers are `X-SmartCard-Event`, `X-SmartCard-Delivery` and `X-SmartCard-Signature: t=<unix>,v1=<hex>`. To verify a delivery, compute `HMAC_SHA256(secret, "<t>." + raw_body)` and compare it with `v1`.
+
+**Phase 4 endpoints**
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/user/plan` | Your plan, its limits and usage |
+| GET / POST / PATCH / DELETE | `/teams`, `/teams/me` | Create, view, update or delete your team |
+| POST | `/teams/me/invites` · `/teams/join` · `/teams/invites/{id}/accept` | Invite a member, join with a token, or accept an invite |
+| PATCH / DELETE | `/teams/me/members/{id}` · POST `/teams/me/leave` | Change roles, remove members, leave |
+| GET | `/teams/me/dashboard?days=30` · `/teams/me/leads/export.csv` | Admin stats and the team lead export |
+| GET | `/integrations` | Webhooks and HubSpot status |
+| POST / PATCH / DELETE | `/integrations/webhooks[/{id}]` · POST `/{id}/test` | Manage webhooks and send a test event |
+| PUT / PATCH / DELETE | `/integrations/hubspot` · POST `/integrations/hubspot/sync` | Connect HubSpot, toggle auto-sync, disconnect, sync all |
+
+Migration `e8b3c6d1f4a7` adds `users.plan`, `teams`, `team_members`, `webhooks` and `integrations`.
 
 ---
 

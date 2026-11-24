@@ -18,6 +18,15 @@ class Settings(BaseSettings):
     APP_DOMAIN: str = "http://localhost:8000"
     # Comma-separated list of allowed browser origins, or "*" for any.
     CORS_ORIGINS: str = "*"
+    # Plan for users without one. Billing isn't live, so everyone gets "team"
+    # (all features). Set to "free" once paid plans can be bought.
+    DEFAULT_PLAN: str = "team"
+    # Key for encrypting CRM tokens at rest (Fernet, urlsafe base64, 32 bytes).
+    # If empty, a key is derived from JWT_SECRET.
+    INTEGRATIONS_ENCRYPTION_KEY: str | None = None
+
+    # Brute-force protection on login / OTP / password reset
+    RATE_LIMITS_ENABLED: bool = True
 
     # ---------------- SOCIAL LOGIN ----------------
     GOOGLE_CLIENT_ID: str | None = None

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.config.settings import settings
 from app.database.connection import get_db
 from app.database.models import NFCLink, Profile, ProfileLink, SlugAlias
-from app.services import wallet_service
+from app.services import plans, wallet_service
 from app.services.cards import get_active_card, require_active_card
 from urllib.parse import quote
 
@@ -143,8 +143,9 @@ def list_links(db: Session = Depends(get_db), card: Profile = Depends(require_ac
 def add_link(payload: LinkIn, db: Session = Depends(get_db), card: Profile = Depends(require_active_card)):
     profile = card
     count = db.query(func.count(ProfileLink.id)).filter(ProfileLink.profile_id == profile.id).scalar() or 0
-    if count >= MAX_LINKS:
-        raise HTTPException(status_code=400, detail=f"You can add up to {MAX_LINKS} links.")
+    max_links = min(MAX_LINKS, plans.plan_for(card.user).max_links)
+    if count >= max_links:
+        raise HTTPException(status_code=400, detail=f"Your plan allows up to {max_links} links.")
     last = db.query(func.max(ProfileLink.position)).filter(ProfileLink.profile_id == profile.id).scalar()
     link = ProfileLink(profile_id=profile.id, label=payload.label, url=payload.url, position=(last or 0) + 1)
     db.add(link)

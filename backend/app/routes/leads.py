@@ -11,7 +11,7 @@ from app.database.connection import get_db
 from app.database.models import Lead, Profile
 from app.services.cards import require_active_card
 from app.schemas.contact_schema import ContactManualCreate, ContactOut
-from app.services import analytics_service, contact_service
+from app.services import analytics_service, contact_service, events, plans
 from app.utils.exporters import build_csv
 from app.utils.jwt_handler import get_current_user
 
@@ -118,6 +118,7 @@ def lead_to_contact(lead_id: UUID, db: Session = Depends(get_db), user=Depends(g
     ))
     lead.is_read = True
     db.commit()
+    events.emit(db, user.id, "contact.saved", events.contact_data(contact))
     return ContactOut.model_validate(contact)
 
 
@@ -136,4 +137,5 @@ def analytics_summary(
     card: Profile = Depends(require_active_card),
 ):
     """Insights for the active card (X-Card-Id header, default: primary)."""
+    days = min(days, plans.plan_for(card.user).insights_days)
     return {**analytics_service.summary(db, card.id, days), "card_id": str(card.id), "card_label": card.label}
