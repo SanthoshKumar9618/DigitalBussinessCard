@@ -61,7 +61,8 @@ export default function ScanScreen() {
 
     // 1️⃣ Extract slug from QR
     if (data.startsWith("http")) {
-      slug = data.split("/").pop();
+      // https://host/public/view/<slug>?src=qr → <slug>
+      slug = data.split(/[?#]/)[0].replace(/\/+$/, "").split("/").pop();
     } else {
       slug = data;
     }
@@ -71,7 +72,7 @@ export default function ScanScreen() {
     }
 
     // 2️⃣ Get profile using slug
-    const profileRes = await api.get(`/public/${slug}`);
+    const profileRes = await api.get(`/public/${slug}`, { params: { src: "qr" } });
 
     // 3️⃣ Save contact (THIS MATCHES BACKEND)
     await api.post("/contacts/", {

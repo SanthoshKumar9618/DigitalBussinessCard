@@ -10,8 +10,15 @@ export const BASE_URL =
 export const PROFILE_BASE_URL =
   process.env.EXPO_PUBLIC_PROFILE_BASE_URL || `${BASE_URL}/public/view`;
 
-export const publicProfileUrl = (slug?: string | null) =>
-  `${PROFILE_BASE_URL}/${slug ?? ""}`;
+/** `src` tags where the visit came from, so Insights can show QR vs NFC vs link. */
+export const publicProfileUrl = (
+  slug?: string | null,
+  src?: "qr" | "nfc" | "link"
+) => `${PROFILE_BASE_URL}/${slug ?? ""}${src ? `?src=${src}` : ""}`;
+
+/** Turn a stored avatar path into a loadable URL. */
+export const assetUrl = (path?: string | null) =>
+  !path ? null : path.startsWith("http") ? path : `${BASE_URL}${path}`;
 
 const api = axios.create({
   baseURL: BASE_URL,

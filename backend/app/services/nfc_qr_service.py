@@ -9,8 +9,9 @@ from app.database.models import NFCLink, Profile, ProfileAudit, UserSettings
 from app.services.visibility import get_visibility
 
 
-def generate_public_link(profile) -> str:
-    return settings.public_profile_url(profile.slug)
+def generate_public_link(profile, src: str | None = None) -> str:
+    url = settings.public_profile_url(profile.slug)
+    return f"{url}?src={src}" if src else url
 
 
 def assign_nfc_to_profile(db: Session, user_id, payload):
@@ -20,7 +21,7 @@ def assign_nfc_to_profile(db: Session, user_id, payload):
     if profile.user_id != user_id:
         raise HTTPException(403, "You can only assign tags to your own profile")
 
-    encoded = generate_public_link(profile)
+    encoded = generate_public_link(profile, "nfc")
 
     mapping = db.query(NFCLink).filter(NFCLink.uid == payload.uid).first()
     if mapping:
@@ -89,7 +90,7 @@ def generate_qr_for_profile(db: Session, profile_id: str):
     if not profile:
         raise HTTPException(404, "Profile not found")
 
-    public_url = generate_public_link(profile)
+    public_url = generate_public_link(profile, "qr")
 
     qr = qrcode.QRCode(border=1)
     qr.add_data(public_url)

@@ -181,7 +181,7 @@ export default function TapScreen() {
               </Text>
 
               <QRCode
-                value={publicProfileUrl(connectedProfile?.slug || "me")}
+                value={publicProfileUrl(connectedProfile?.slug || "me", "qr")}
                 size={160}
                 color="#000"
                 backgroundColor="#FFF"
@@ -190,7 +190,7 @@ export default function TapScreen() {
               <TouchableOpacity
                 onPress={() =>
                   Clipboard.setStringAsync(
-                    publicProfileUrl(connectedProfile?.slug || "me")
+                    publicProfileUrl(connectedProfile?.slug || "me", "link")
                   )
                 }
               >

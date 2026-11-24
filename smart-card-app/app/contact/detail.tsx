@@ -1,5 +1,8 @@
+import { useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
+  TextInput,
   View,
   Text,
   Image,
@@ -15,6 +18,7 @@ import SafeScreen from "@/components/ui/Screen1";
 import { deleteContact } from "@/services/contactService";
 import { useRefresh } from "@/components/context/RefreshContext";
 import { BASE_URL } from "@/services/api";
+import { updateContactNotes } from "@/services/leadService";
 
 export default function ContactDetail() {
   const params = useLocalSearchParams();
@@ -27,10 +31,35 @@ export default function ContactDetail() {
       ? JSON.parse(params.contact)
       : null;
 
+  const [notes, setNotes] = useState<string>(data?.notes ?? "");
+  const [tag, setTag] = useState<string>(data?.tag ?? "");
+  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const dirty = notes !== (data?.notes ?? "") || tag !== (data?.tag ?? "");
+
   if (!data) return null;
+
+  const saveNotes = async () => {
+    setSaving(true);
+    try {
+      const cleanTag = tag.trim().replace(/^#/, "");
+      const res = await updateContactNotes(data.id, { notes: notes.trim(), tag: cleanTag });
+      data.notes = res.data.notes ?? "";
+      data.tag = res.data.tag ?? "";
+      setNotes(data.notes);
+      setTag(data.tag);
+      setSavedAt(Date.now());
+      refreshContacts();
+    } catch {
+      Alert.alert("Couldn't save", "Check your connection and try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const avatar = data.target_profile?.avatar_url ?? null;
   const phone = data.saved_phone;
+  const waDigits = String(data.saved_whatsapp || phone || "").replace(/\D/g, "");
   const email = data.saved_email;
 
   const handleDelete = () => {
@@ -108,11 +137,11 @@ export default function ContactDetail() {
         )}
 
         {/* WHATSAPP */}
-        {phone && (
+        {!!waDigits && (
           <ActionRow
             icon="logo-whatsapp"
             label="WhatsApp"
-            onPress={() => Linking.openURL(`https://wa.me/${phone}`)}
+            onPress={() => Linking.openURL(`https://wa.me/${waDigits}`)}
             colors={colors}
           />
         )}
@@ -178,16 +207,47 @@ export default function ContactDetail() {
 )}
 
 
-        {/* NOTES */}
-        {data.notes && (
-          <>
-            <Text style={[styles.section, { color: colors.subText }]}>
-              NOTES
-            </Text>
-            <View style={[styles.box, { backgroundColor: colors.card }]}>
-              <Text style={{ color: colors.text }}>{data.notes}</Text>
-            </View>
-          </>
+        {/* NOTES & TAG (private to you) */}
+        <Text style={[styles.section, { color: colors.subText }]}>
+          NOTES · ONLY YOU SEE THIS
+        </Text>
+        <TextInput
+          value={notes}
+          onChangeText={setNotes}
+          placeholder="Where did you meet? What did you talk about?"
+          placeholderTextColor={colors.subText}
+          multiline
+          maxLength={2000}
+          accessibilityLabel="Notes"
+          style={[styles.box, styles.notesInput, { backgroundColor: colors.card, color: colors.text }]}
+        />
+        <TextInput
+          value={tag}
+          onChangeText={setTag}
+          placeholder="#tag (e.g. investor, client)"
+          placeholderTextColor={colors.subText}
+          autoCapitalize="none"
+          maxLength={120}
+          accessibilityLabel="Tag"
+          style={[styles.box, styles.tagInput, { backgroundColor: colors.card, color: colors.text }]}
+        />
+        {(dirty || saving) && (
+          <TouchableOpacity
+            onPress={saveNotes}
+            disabled={saving}
+            style={[styles.saveBtn, { backgroundColor: colors.primary }]}
+            accessibilityRole="button"
+            accessibilityLabel="Save notes"
+          >
+            {saving ? (
+              <ActivityIndicator color={colors.onPrimary} />
+            ) : (
+              <Text style={{ color: colors.onPrimary, fontWeight: "700", fontSize: 15 }}>Save notes</Text>
+            )}
+          </TouchableOpacity>
+        )}
+        {!dirty && !saving && savedAt && (
+          <Text style={{ color: colors.success, marginTop: 8, fontSize: 13 }}>Saved</Text>
         )}
 
         {/* DELETE */}
@@ -263,6 +323,9 @@ const styles = StyleSheet.create({
   actionText: { marginLeft: 10, fontSize: 15, fontWeight: "600" },
   section: { marginTop: 28, marginBottom: 8, fontSize: 12, fontWeight: "600" },
   box: { padding: 14, borderRadius: 14 },
+  notesInput: { minHeight: 96, textAlignVertical: "top", fontSize: 15 },
+  tagInput: { marginTop: 10, fontSize: 15 },
+  saveBtn: { marginTop: 12, minHeight: 46, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   deleteButton: { flexDirection: "row", alignSelf: "center", alignItems: "center", backgroundColor: "#E53935", paddingHorizontal: 24, paddingVertical: 12, borderRadius: 14, marginTop: 32 },
   deleteButtonText: { color: "#FFF", fontSize: 15, fontWeight: "600", marginLeft: 8 },
 

@@ -273,3 +273,27 @@ class ProfileCardSettings(Base):
         return f"<ProfileCardSettings {self.profile_id}>"
     
 # -------------------- End of models.py --------------------
+
+# -------------------- Lead (two-way exchange) --------------------
+class Lead(Base):
+    """Details a visitor shared back from someone's public profile page."""
+    __tablename__ = "leads"
+    __table_args__ = (Index("ix_leads_profile_created", "profile_id", "created_at"),)
+
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    profile_id = Column(PG_UUID(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False)
+
+    name = Column(String(255), nullable=False)
+    email = Column(String(255), nullable=True)
+    phone = Column(String(64), nullable=True)
+    company = Column(String(255), nullable=True)
+    note = Column(Text, nullable=True)
+    source = Column(String(20), nullable=True)  # qr | nfc | link
+
+    is_read = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    profile = relationship("Profile", foreign_keys=[profile_id])
+
+    def __repr__(self):
+        return f"<Lead {self.name} -> {self.profile_id}>"

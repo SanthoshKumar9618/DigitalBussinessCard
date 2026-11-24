@@ -2,6 +2,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.database.models import Contact, Profile
+from app.services import analytics_service
 from app.services.visibility import get_visibility
 
 
@@ -55,6 +56,18 @@ def add_contact(db: Session, owner_id, payload):
         source=payload.source,
     )
     db.add(contact)
+    analytics_service.log_event(db, profile.id, "contact_saved", payload.source or "app", commit=False)
+    db.commit()
+    db.refresh(contact)
+    return contact
+
+
+def update_contact(db: Session, owner_id, contact_id, payload):
+    contact = db.query(Contact).filter(Contact.id == contact_id, Contact.owner_id == owner_id).first()
+    if not contact:
+        return None
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(contact, field, (value or "").strip() or None)
     db.commit()
     db.refresh(contact)
     return contact

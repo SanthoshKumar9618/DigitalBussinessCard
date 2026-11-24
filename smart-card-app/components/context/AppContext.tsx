@@ -37,19 +37,29 @@ type AppContextType = {
 const DarkColors = {
   bg: "#0B0B0B",
   card: "#111827",
+  elevated: "#1A2230",
   text: "#FFFFFF",
   subText: "#9CA3AF",
   border: "#1F2937",
   primary: "#C9A24D",
+  primarySoft: "rgba(201,162,77,0.14)",
+  onPrimary: "#0B0B0B",
+  success: "#22C55E",
+  danger: "#EF4444",
 };
 
-const LightColors = {
+const LightColors: typeof DarkColors = {
   bg: "#FFFFFF",
   card: "#F3F4F6",
+  elevated: "#FFFFFF",
   text: "#111827",
   subText: "#6B7280",
   border: "#E5E7EB",
-  primary: "#C9A24D",
+  primary: "#B08A35",
+  primarySoft: "rgba(176,138,53,0.12)",
+  onPrimary: "#FFFFFF",
+  success: "#16A34A",
+  danger: "#DC2626",
 };
 
 /* ---------------- CONTEXT ---------------- */
@@ -69,16 +79,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
 
   const refreshSettings = async () => {
-  console.log("========== SETTINGS ==========");
-
   try {
     const data = await getSettings();
 
-    console.log("SETTINGS RESPONSE =", JSON.stringify(data, null, 2));
-
     setSettings(data);
 
-    console.log("SETTINGS SAVED");
   } catch (e: any) {
     console.log("SETTINGS ERROR STATUS =", e.response?.status);
     console.log("SETTINGS ERROR BODY =", e.response?.data);

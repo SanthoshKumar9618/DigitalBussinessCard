@@ -4,7 +4,7 @@ import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function ShareModal({ visible, onClose, profile }: any) {
-  const profileUrl = publicProfileUrl(profile.slug);
+  const profileUrl = publicProfileUrl(profile.slug, "link");
 
   const copyLink = async () => {
     await Clipboard.setStringAsync(profileUrl);

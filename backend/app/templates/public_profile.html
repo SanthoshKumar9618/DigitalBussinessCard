@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{{ p.display_name }}{% if p.company %} · {{ p.company }}{% endif %} | SmartCard</title>
+  <meta name="description" content="{{ subtitle or 'Digital business card' }}">
+  <meta property="og:title" content="{{ p.display_name }}">
+  <meta property="og:description" content="{{ subtitle or 'Digital business card' }}">
+  {% if avatar %}<meta property="og:image" content="{{ avatar }}">{% endif %}
+  <meta name="theme-color" content="#0B0B0B">
+  <style>
+    :root {
+      --bg: #0B0B0B; --card: #111827; --elevated: #1A2230; --border: #1F2937;
+      --text: #FFFFFF; --sub: #9CA3AF; --gold: #C9A24D; --gold-soft: rgba(201,162,77,.14);
+      --on-gold: #0B0B0B; --ok: #22C55E; --danger: #EF4444;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #F7F7F5; --card: #FFFFFF; --elevated: #FFFFFF; --border: #E5E7EB;
+        --text: #111827; --sub: #6B7280; --gold: #B08A35; --gold-soft: rgba(176,138,53,.12);
+        --on-gold: #FFFFFF; --ok: #15803D; --danger: #B91C1C;
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--text);
+      font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased; }
+    .wrap { max-width: 440px; margin: 0 auto; padding: 0 16px 32px; }
+    .hero { height: 132px; margin: 0 -16px;
+      background: radial-gradient(120% 140% at 50% 0%, var(--gold) 0%, rgba(201,162,77,.25) 45%, transparent 75%); }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 22px;
+      margin-top: -72px; padding: 0 20px 24px; text-align: center;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+    .avatar { width: 112px; height: 112px; border-radius: 50%; object-fit: cover;
+      border: 4px solid var(--card); margin-top: -56px; background: var(--elevated);
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 40px; font-weight: 700; color: var(--gold); }
+    h1 { font-size: 26px; line-height: 1.2; margin: 12px 0 4px; font-weight: 700; letter-spacing: -.01em; }
+    .subtitle { color: var(--sub); margin: 0; font-size: 15px; }
+    .bio { margin: 14px 0 0; font-size: 15px; white-space: pre-line; }
+    .quick { display: flex; justify-content: center; gap: 14px; margin: 20px 0 4px; flex-wrap: wrap; }
+    .quick a { width: 52px; height: 52px; border-radius: 50%; display: inline-flex; align-items: center;
+      justify-content: center; background: var(--gold-soft); color: var(--gold); text-decoration: none; }
+    .quick a:focus-visible, .btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+    .quick svg { width: 22px; height: 22px; }
+    .quick small { display: block; }
+    .btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%;
+      min-height: 52px; border-radius: 14px; font-size: 16px; font-weight: 600; text-decoration: none;
+      border: 0; cursor: pointer; margin-top: 12px; font-family: inherit; }
+    .btn-primary { background: var(--gold); color: var(--on-gold); }
+    .btn-outline { background: transparent; color: var(--text); border: 1.5px solid var(--border); }
+    .btn svg { width: 20px; height: 20px; }
+    .links { margin-top: 18px; text-align: left; }
+    .links a { display: flex; align-items: center; gap: 12px; padding: 14px 4px; color: var(--text);
+      text-decoration: none; border-top: 1px solid var(--border); }
+    .links svg { width: 20px; height: 20px; flex: none; color: var(--gold); }
+    .links a span.label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .links a .chev { color: var(--sub); }
+    .panel { background: var(--card); border: 1px solid var(--border); border-radius: 22px; padding: 20px; margin-top: 16px; }
+    .panel h2 { margin: 0 0 4px; font-size: 18px; }
+    .panel p.hint { margin: 0 0 14px; color: var(--sub); font-size: 14px; }
+    label { display: block; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+      color: var(--sub); margin: 12px 0 6px; }
+    input, textarea { width: 100%; padding: 13px 14px; font: inherit; color: var(--text); background: var(--elevated);
+      border: 1px solid var(--border); border-radius: 14px; }
+    input:focus, textarea:focus { outline: none; border-color: var(--gold); }
+    textarea { resize: vertical; min-height: 72px; }
+    .hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+    .notice { border-radius: 14px; padding: 12px 14px; margin-top: 16px; font-size: 14px; }
+    .notice.ok { background: rgba(34,197,94,.12); color: var(--ok); }
+    .notice.err { background: rgba(239,68,68,.12); color: var(--danger); }
+    details summary { list-style: none; }
+    details summary::-webkit-details-marker { display: none; }
+    footer { text-align: center; color: var(--sub); font-size: 12px; margin-top: 24px; }
+    footer a { color: var(--gold); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="hero" aria-hidden="true"></div>
+
+    <section class="card" aria-labelledby="name">
+      {% if avatar %}
+        <img class="avatar" src="{{ avatar }}" alt="{{ p.display_name }}" width="112" height="112">
+      {% else %}
+        <div class="avatar" aria-hidden="true">{{ initials }}</div>
+      {% endif %}
+
+      <h1 id="name">{{ p.display_name }}</h1>
+      {% if subtitle %}<p class="subtitle">{{ subtitle }}</p>{% endif %}
+      {% if p.bio %}<p class="bio">{{ p.bio }}</p>{% endif %}
+
+      {% if quick %}
+      <nav class="quick" aria-label="Contact">
+        {% for q in quick %}
+          <a href="{{ q.href }}" aria-label="{{ q.label }}" {% if q.external %}target="_blank" rel="noopener noreferrer"{% endif %}>
+            {{ q.icon | safe }}
+          </a>
+        {% endfor %}
+      </nav>
+      {% endif %}
+
+      <a class="btn btn-primary" href="{{ vcard_url }}" download>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14"/></svg>
+        Save contact
+      </a>
+      <a class="btn btn-outline" href="#exchange">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg>
+        Share my details
+      </a>
+
+      {% if links %}
+      <div class="links">
+        {% for l in links %}
+          <a href="{{ l.href }}" target="_blank" rel="noopener noreferrer">
+            {{ l.icon | safe }}<span class="label">{{ l.label }}</span><span class="chev" aria-hidden="true">›</span>
+          </a>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </section>
+
+    {% if sent %}
+      <div class="notice ok" role="status" id="exchange">Thanks! {{ first_name }} now has your details.</div>
+    {% elif error %}
+      <div class="notice err" role="alert">{{ error }}</div>
+    {% endif %}
+
+    {% if not sent %}
+    <section class="panel" id="exchange" aria-labelledby="exchange-title">
+      <h2 id="exchange-title">Share your details with {{ first_name }}</h2>
+      <p class="hint">So {{ first_name }} can follow up. Only {{ first_name }} sees this.</p>
+      <form method="post" action="{{ lead_url }}">
+        <input type="hidden" name="src" value="{{ src }}">
+        <div class="hp" aria-hidden="true">
+          <label for="website_url">Leave this empty</label>
+          <input id="website_url" name="website_url" tabindex="-1" autocomplete="off">
+        </div>
+        <label for="lead-name">Your name *</label>
+        <input id="lead-name" name="name" required maxlength="255" autocomplete="name">
+        <label for="lead-email">Email</label>
+        <input id="lead-email" name="email" type="email" maxlength="255" autocomplete="email" inputmode="email">
+        <label for="lead-phone">Phone</label>
+        <input id="lead-phone" name="phone" type="tel" maxlength="64" autocomplete="tel" inputmode="tel">
+        <label for="lead-company">Company</label>
+        <input id="lead-company" name="company" maxlength="255" autocomplete="organization">
+        <label for="lead-note">Note</label>
+        <textarea id="lead-note" name="note" maxlength="500" placeholder="Where did we meet?"></textarea>
+        <button class="btn btn-primary" type="submit">Send my details</button>
+      </form>
+    </section>
+    {% endif %}
+
+    <footer>Powered by <a href="{{ home_url }}">SmartCard</a></footer>
+  </main>
+</body>
+</html>

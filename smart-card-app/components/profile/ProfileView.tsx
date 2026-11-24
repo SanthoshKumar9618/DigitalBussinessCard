@@ -123,7 +123,7 @@ export default function ProfileView({ profile, onRefresh }: any) {
 
   const shareProfile = async () => {
     await Share.share({
-      message: `Connect with me:\n${publicProfileUrl(profile.slug)}`,
+      message: `Connect with me:\n${publicProfileUrl(profile.slug, "link")}`,
     });
   };
 
@@ -374,7 +374,7 @@ export default function ProfileView({ profile, onRefresh }: any) {
             </Text>
 
             <QRCode
-              value={publicProfileUrl(profile.slug)}
+              value={publicProfileUrl(profile.slug, "qr")}
               size={140}
               color="#000"
               backgroundColor="#FFF"
@@ -382,7 +382,7 @@ export default function ProfileView({ profile, onRefresh }: any) {
 
             <TouchableOpacity
               onPress={() =>
-                copyText(publicProfileUrl(profile.slug))
+                copyText(publicProfileUrl(profile.slug, "link"))
               }
             >
               <Text
