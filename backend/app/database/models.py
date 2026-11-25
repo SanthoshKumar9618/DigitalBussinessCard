@@ -128,6 +128,12 @@ class Contact(Base):
     __tablename__ = "contacts"
     __table_args__ = (
         Index("ix_contacts_owner_profile", "owner_id", "target_profile_id"),
+        # Fast lookup of open follow-up reminders (created in migration d2a7f5c3e9b1)
+        Index(
+            "ix_contacts_owner_follow_up", "owner_id", "follow_up_at",
+            postgresql_where=text("follow_up_at IS NOT NULL AND NOT follow_up_done"),
+            sqlite_where=text("follow_up_at IS NOT NULL AND NOT follow_up_done"),
+        ),
     )
 
     id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
