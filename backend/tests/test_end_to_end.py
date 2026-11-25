@@ -678,4 +678,7 @@ def test_end_to_end(capsys):
     _ur4.urlopen = _orig4
     EV.url_problem = _real_problem
 
+    if failures:
+        # Workflow command: shows up as a public annotation on the CI run.
+        print("::error title=End-to-end checks failed::" + " | ".join(failures)[:900])
     assert not failures, f"{len(failures)} check(s) failed: {failures}"
