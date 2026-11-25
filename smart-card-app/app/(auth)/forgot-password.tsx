@@ -1,152 +1,59 @@
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  KeyboardAvoidingView,
-  ScrollView,
-  Platform,
-} from "react-native";
 import { useState } from "react";
 import { router } from "expo-router";
 import { forgotPassword } from "../../services/authService";
+import AuthLayout, { AuthLink, FormError } from "@/components/ui/AuthLayout";
+import Button from "@/components/ui/Button";
+import TextField from "@/components/ui/TextField";
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSendOtp = async () => {
-    if (!email) {
-      Alert.alert("Error", "Email is required");
+    if (!email.trim()) {
+      setError("Enter the email you signed up with");
       return;
     }
-
     try {
       setLoading(true);
-      await forgotPassword(email);
-
-      Alert.alert("OTP Sent", "Check your email for the OTP");
-      router.push({
-              pathname: "/reset-password",
-              params: { identifier: email },
-       });
-
+      setError(null);
+      await forgotPassword(email.trim());
+      router.push({ pathname: "/reset-password", params: { identifier: email.trim() } });
     } catch (err: any) {
-      Alert.alert(
-        "Error",
-        err?.response?.data?.detail || "Failed to send OTP"
-      );
+      const detail = err?.response?.data?.detail;
+      setError(typeof detail === "string" ? detail : "Couldn't send the code. Try again.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView
-         style={{ flex: 1 }}
-         behavior={Platform.OS === "ios" ? "padding" : "height"}
-       >
-         <ScrollView
-           contentContainerStyle={styles.container}
-           keyboardShouldPersistTaps="handled"
-           showsVerticalScrollIndicator={false}
-         >
-           <View style={styles.card}>
-        <Text style={styles.title}>Forgot Password</Text>
-        <Text style={styles.subtitle}>
-          Enter your registered email to receive an OTP.
-        </Text>
-
-        <TextInput
-          placeholder="Email address"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          value={email}
-          onChangeText={setEmail}
-          style={styles.input}
-        />
-
-        <TouchableOpacity
-          style={styles.primaryButton}
-          onPress={handleSendOtp}
-          disabled={loading}
-        >
-          <Text style={styles.primaryText}>
-            {loading ? "Sending..." : "Send OTP"}
-          </Text>
-        </TouchableOpacity>
-
-        <Text style={styles.link} onPress={() => router.back()}>
-          Back to login
-        </Text>
-      </View>
-    </ScrollView>
-    </KeyboardAvoidingView>
+    <AuthLayout
+      icon="key-outline"
+      title="Forgot password?"
+      subtitle="Enter your email and we'll send you a code to reset it"
+      onBack={() => router.back()}
+      footer={<AuthLink text="Remembered it?" action="Back to sign in" onPress={() => router.back()} />}
+    >
+      <TextField
+        label="Email"
+        icon="mail-outline"
+        placeholder="you@company.com"
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="email"
+        value={email}
+        onChangeText={(v) => {
+          setEmail(v);
+          setError(null);
+        }}
+        returnKeyType="send"
+        onSubmitEditing={handleSendOtp}
+      />
+      <FormError message={error} />
+      <Button title="Send reset code" onPress={handleSendOtp} loading={loading} />
+    </AuthLayout>
   );
 }
-
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#0F172A",
-    justifyContent: "center",
-    padding: 20,
-  },
-
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    padding: 24,
-  },
-
-  title: {
-    fontSize: 26,
-    fontWeight: "700",
-    textAlign: "center",
-    marginBottom: 6,
-    color: "#020617",
-  },
-
-  subtitle: {
-    textAlign: "center",
-    color: "#64748B",
-    marginBottom: 20,
-    fontSize: 14,
-  },
-
-  input: {
-    borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 12,
-    fontSize: 15,
-    backgroundColor: "#FFFFFF",
-    color: "#020617",
-  },
-
-  primaryButton: {
-    backgroundColor: "#2563EB",
-    padding: 16,
-    borderRadius: 12,
-    marginTop: 6,
-  },
-
-  primaryText: {
-    color: "#FFFFFF",
-    textAlign: "center",
-    fontWeight: "600",
-    fontSize: 16,
-  },
-
-  link: {
-    color: "#2563EB",
-    textAlign: "center",
-    marginTop: 16,
-    fontSize: 14,
-    fontWeight: "500",
-  },
-});

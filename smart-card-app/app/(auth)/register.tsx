@@ -1,9 +1,14 @@
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, ScrollView,Platform } from "react-native";
-import { useState } from "react";
-import { registerUser } from "../../services/authService";
+import { useRef, useState } from "react";
+import { TextInputInstance } from "react-native";
 import { router } from "expo-router";
-import { useAuth } from "../../context/AuthContext"; // ADD
-import { Ionicons } from "@expo/vector-icons";
+import { registerUser } from "../../services/authService";
+import AuthLayout, { AuthLink, FormError } from "@/components/ui/AuthLayout";
+import Button from "@/components/ui/Button";
+import TextField from "@/components/ui/TextField";
+
+type Field = "name" | "email" | "phone" | "password" | "confirm";
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function RegisterScreen() {
   const [name, setName] = useState("");
@@ -11,207 +16,154 @@ export default function RegisterScreen() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const { login } = useAuth(); // ADD
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
- 
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
+  const [formError, setFormError] = useState<string | null>(null);
 
+  const emailRef = useRef<TextInputInstance>(null);
+  const phoneRef = useRef<TextInputInstance>(null);
+  const passwordRef = useRef<TextInputInstance>(null);
+  const confirmRef = useRef<TextInputInstance>(null);
 
- const handleRegister = async () => {
-  if (!name || !email || !phone || !password || !confirmPassword) {
-    alert("All fields are required");
-    return;
-  }
+  const clear = (f: Field) => {
+    setErrors((e) => ({ ...e, [f]: undefined }));
+    setFormError(null);
+  };
 
-  if (password !== confirmPassword) {
-    alert("Passwords do not match");
-    return;
-  }
+  const validate = () => {
+    const e: Partial<Record<Field, string>> = {};
+    if (!name.trim()) e.name = "Enter your name";
+    if (!EMAIL_RE.test(email.trim())) e.email = "Enter a valid email";
+    if (phone.replace(/\D/g, "").length < 7) e.phone = "Enter a valid phone number";
+    if (password.length < 8) e.password = "Use at least 8 characters";
+    if (confirmPassword !== password) e.confirm = "Passwords don't match";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
 
-  try {
-    const payload = {
-      name: name.trim(),
-      email: email.trim(),
-      phone: phone.trim(),
-      password,
-      confirm_password: confirmPassword,
-    };
-
-    const data = await registerUser(payload);
-    // Registration returns no token: the user logs in after verifying the OTP.
-    router.push({
-      pathname: "/verify-email",
-      params: { userId: data.user_id },
-    });
-
-  } catch (err: any) {
-    alert(err?.response?.data?.detail || "Registration failed");
-  }
-};
+  const handleRegister = async () => {
+    if (!validate()) return;
+    try {
+      setLoading(true);
+      setFormError(null);
+      const data = await registerUser({
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        password,
+        confirm_password: confirmPassword,
+      });
+      // No token yet: the user signs in by verifying the emailed code.
+      router.push({ pathname: "/verify-email", params: { userId: data.user_id, email: email.trim() } });
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      setFormError(
+        typeof detail === "string"
+          ? detail
+          : err?.message === "Network Error"
+            ? "Can't reach the server. Check your connection and try again."
+            : "Registration failed"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <KeyboardAvoidingView
-  style={{ flex: 1 }}
-  behavior={Platform.OS === "ios" ? "padding" : "height"}
->
-  <ScrollView
-    contentContainerStyle={styles.container}
-    keyboardShouldPersistTaps="handled"
-    showsVerticalScrollIndicator={false}
-  >
-    <View style={styles.card}>
+    <AuthLayout
+      title="Create your card"
+      subtitle="Set up your digital business card in a minute"
+      onBack={() => router.back()}
+      footer={<AuthLink text="Already have an account?" action="Sign in" onPress={() => router.back()} />}
+    >
+      <TextField
+        label="Full name"
+        icon="person-outline"
+        placeholder="Priya Sharma"
+        value={name}
+        onChangeText={(v) => {
+          setName(v);
+          clear("name");
+        }}
+        error={errors.name}
+        autoComplete="name"
+        textContentType="name"
+        returnKeyType="next"
+        onSubmitEditing={() => emailRef.current?.focus()}
+      />
+      <TextField
+        ref={emailRef}
+        label="Email"
+        icon="mail-outline"
+        placeholder="you@company.com"
+        value={email}
+        onChangeText={(v) => {
+          setEmail(v);
+          clear("email");
+        }}
+        error={errors.email}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="email"
+        textContentType="emailAddress"
+        returnKeyType="next"
+        onSubmitEditing={() => phoneRef.current?.focus()}
+      />
+      <TextField
+        ref={phoneRef}
+        label="Phone"
+        icon="call-outline"
+        placeholder="+91 98765 43210"
+        value={phone}
+        onChangeText={(v) => {
+          setPhone(v);
+          clear("phone");
+        }}
+        error={errors.phone}
+        keyboardType="phone-pad"
+        autoComplete="tel"
+        textContentType="telephoneNumber"
+        returnKeyType="next"
+        onSubmitEditing={() => passwordRef.current?.focus()}
+      />
+      <TextField
+        ref={passwordRef}
+        label="Password"
+        icon="lock-closed-outline"
+        placeholder="At least 8 characters"
+        password
+        value={password}
+        onChangeText={(v) => {
+          setPassword(v);
+          clear("password");
+        }}
+        error={errors.password}
+        autoComplete="new-password"
+        textContentType="newPassword"
+        returnKeyType="next"
+        onSubmitEditing={() => confirmRef.current?.focus()}
+      />
+      <TextField
+        ref={confirmRef}
+        label="Confirm password"
+        icon="lock-closed-outline"
+        placeholder="Type it again"
+        password
+        value={confirmPassword}
+        onChangeText={(v) => {
+          setConfirmPassword(v);
+          clear("confirm");
+        }}
+        error={errors.confirm}
+        autoComplete="new-password"
+        textContentType="newPassword"
+        returnKeyType="go"
+        onSubmitEditing={handleRegister}
+      />
 
-        <Text style={styles.title}>Create Account</Text>
-        <Text style={styles.subtitle}>Your digital business card</Text>
-
-        <TextInput
-          placeholder="Full Name"
-          value={name}
-          onChangeText={setName}
-          style={styles.input}
-        />
-
-        <TextInput
-          placeholder="Email"
-          value={email}
-          onChangeText={setEmail}
-          style={styles.input}
-        />
-
-        <TextInput
-          placeholder="Phone"
-          value={phone}
-          onChangeText={setPhone}
-          style={styles.input}
-        />
-
-        <View style={styles.passwordWrapper}>
-  <TextInput
-    placeholder="New password"
-    secureTextEntry={!showPassword}
-    value={password}
-    onChangeText={setPassword}
-    style={styles.passwordInput}
-  />
-
-  <TouchableOpacity
-    onPress={() => setShowPassword(!showPassword)}
-    style={styles.eyeButton}
-    activeOpacity={0.7}
-  >
-    <Ionicons
-      name={showPassword ? "eye-off" : "eye"}
-      size={22}
-      color="#64748B"
-    />
-  </TouchableOpacity>
-</View>
-
-
-        <View style={styles.passwordWrapper}>
-  <TextInput
-    placeholder="Confirm password"
-    secureTextEntry={!showConfirmPassword}
-    value={confirmPassword}
-    onChangeText={setConfirmPassword}
-    style={styles.passwordInput}
-  />
-
-  <TouchableOpacity
-    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-    style={styles.eyeButton}
-    activeOpacity={0.7}
-  >
-    <Ionicons
-      name={showConfirmPassword ? "eye-off" : "eye"}
-      size={22}
-      color="#64748B"
-    />
-  </TouchableOpacity>
-</View>
-
-
-        <TouchableOpacity style={styles.button} onPress={handleRegister}>
-          <Text style={styles.buttonText}>Register</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.link} onPress={() => router.back()}>
-          Already have an account?
-        </Text>
-      </View>
-    
-  </ScrollView>
-    </KeyboardAvoidingView>
+      <FormError message={formError} />
+      <Button title="Create account" onPress={handleRegister} loading={loading} style={{ marginTop: 4 }} />
+    </AuthLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#020617",
-    justifyContent: "center",
-    padding: 20,
-  },
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 24,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: "700",
-    textAlign: "center",
-    marginBottom: 6,
-  },
-  subtitle: {
-    textAlign: "center",
-    color: "#64748B",
-    marginBottom: 20,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 12,
-  },
-  button: {
-    backgroundColor: "#16A34A",
-    padding: 14,
-    borderRadius: 10,
-    marginTop: 10,
-  },
-  buttonText: {
-    color: "#FFFFFF",
-    textAlign: "center",
-    fontWeight: "600",
-  },
-  link: {
-    marginTop: 15,
-    textAlign: "center",
-    color: "#2563EB",
-    fontWeight: "500",
-  },
-  passwordWrapper: {
-  flexDirection: "row",
-  alignItems: "center",
-  borderWidth: 1,
-  borderColor: "#CBD5E1",
-  borderRadius: 12,
-  backgroundColor: "#FFFFFF",
-  paddingHorizontal: 14,
-  marginBottom: 12,
-},
-
-passwordInput: {
-  flex: 1,
-  paddingVertical: 14,
-  fontSize: 15,
-  color: "#020617",
-},
-
-eyeButton: {
-  paddingLeft: 8,
-},
-
-});

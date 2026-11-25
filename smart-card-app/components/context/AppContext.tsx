@@ -35,29 +35,34 @@ type AppContextType = {
 
 /* ---------------- THEMES ---------------- */
 
+// Warm neutrals so the greys sit with the gold (see docs/PRODUCT_STRATEGY.md §3.2).
 const DarkColors = {
-  bg: "#0B0B0B",
-  card: "#111827",
-  elevated: "#1A2230",
-  text: "#FFFFFF",
-  subText: "#9CA3AF",
-  border: "#1F2937",
+  bg: "#0B0B0C",
+  card: "#161618",
+  elevated: "#1E1E21",
+  text: "#F5F5F4",
+  subText: "#A8A29E",
+  placeholder: "#6F6A66",
+  border: "#2A2A2D",
   primary: "#C9A24D",
   primarySoft: "rgba(201,162,77,0.14)",
-  onPrimary: "#0B0B0B",
+  onPrimary: "#0B0B0C",
   success: "#22C55E",
   danger: "#EF4444",
 };
 
+// Default theme: warm ivory background, white cards, gold accent.
 const LightColors: typeof DarkColors = {
-  bg: "#FFFFFF",
-  card: "#F3F4F6",
-  elevated: "#FFFFFF",
-  text: "#111827",
-  subText: "#6B7280",
-  border: "#E5E7EB",
-  primary: "#B08A35",
-  primarySoft: "rgba(176,138,53,0.12)",
+  bg: "#F6F3EC",
+  card: "#FFFFFF",
+  elevated: "#FBF9F4",
+  text: "#1C1917",
+  subText: "#6B6560",
+  placeholder: "#A8A29E",
+  border: "#E8E2D6",
+  // Darker gold in light mode so gold text and white-on-gold pass 4.5:1.
+  primary: "#94701F",
+  primarySoft: "rgba(148,112,31,0.12)",
   onPrimary: "#FFFFFF",
   success: "#16A34A",
   danger: "#DC2626",
@@ -126,7 +131,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 };
 
 
-  const theme = settings?.theme || "dark";
+  // Light unless the user picked Dark in Settings (also before sign-in).
+  const theme: "dark" | "light" = settings?.theme === "dark" ? "dark" : "light";
   const colors = theme === "dark" ? DarkColors : LightColors;
 
   return (

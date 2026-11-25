@@ -1,58 +1,60 @@
-import { publicProfileUrl } from "../../services/api";
 import { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Modal,
-  Image,
-  Alert,
-  Platform,
-} from "react-native";
+import { Alert, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { getNfc, nfcSupportedInThisBuild } from "../../services/nfc";
-import { resolveNfc } from "../../services/nfcService";
-import { saveContact } from "../../services/contactService";
 import QRCode from "react-native-qrcode-svg";
 import * as Clipboard from "expo-clipboard";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Animated, {
+  Easing,
+  useAnimatedStyle,
   useSharedValue,
   withRepeat,
   withTiming,
 } from "react-native-reanimated";
-import { useApp } from "../../components/context/AppContext";
-import SafeScreen from "../../components/ui/Screen1";
 
-/* ---------------- SCREEN ---------------- */
+import { assetUrl, publicProfileUrl } from "../../services/api";
+import { getNfc, nfcSupportedInThisBuild } from "../../services/nfc";
+import { resolveNfc } from "../../services/nfcService";
+import { saveContact } from "../../services/contactService";
+import { useApp } from "../../components/context/AppContext";
+import { useCards } from "../../context/CardContext";
+import SafeScreen from "../../components/ui/Screen1";
+import Button from "../../components/ui/Button";
+import { Avatar, ScreenHeader, Surface } from "../../components/ui/kit";
+import { Radius, Space, Type } from "../../constants/design";
 
 export default function TapScreen() {
   const router = useRouter();
   const { settings, colors } = useApp();
+  const { activeCard } = useCards();
+  const { showQr: showQrParam } = useLocalSearchParams();
 
   const [connectedProfile, setConnectedProfile] = useState<any>(null);
   const [showModal, setShowModal] = useState(false);
   const [showQr, setShowQr] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  const { showQr: showQrParam } = useLocalSearchParams();
+  // Your own card link (the active card), not the person you just tapped.
+  const mySlug = activeCard?.slug ?? "";
+  const myLink = mySlug ? publicProfileUrl(mySlug, "link") : "";
 
-  const pulse = useSharedValue(1);
-
-  /* ---------------- EFFECTS ---------------- */
+  /* Two expanding rings around the NFC button. */
+  const t = useSharedValue(0);
+  useEffect(() => {
+    t.value = withRepeat(withTiming(1, { duration: 2400, easing: Easing.out(Easing.quad) }), -1, false);
+  }, [t]);
+  const ringA = useAnimatedStyle(() => ({
+    transform: [{ scale: 0.6 + t.value * 0.6 }],
+    opacity: 0.35 * (1 - t.value),
+  }));
+  const ringB = useAnimatedStyle(() => {
+    const v = (t.value + 0.5) % 1;
+    return { transform: [{ scale: 0.6 + v * 0.6 }], opacity: 0.35 * (1 - v) };
+  });
 
   useEffect(() => {
-    pulse.value = withRepeat(
-      withTiming(1.4, { duration: 2000 }),
-      -1,
-      true
-    );
-  }, []);
-
-  useEffect(() => {
-    if (showQrParam === "true") {
-      setShowQr(true);
-    }
+    if (showQrParam === "true") setShowQr(true);
   }, [showQrParam]);
 
   useEffect(() => {
@@ -63,8 +65,6 @@ export default function TapScreen() {
       nfc.default.cancelTechnologyRequest().catch(() => {});
     };
   }, []);
-
-  /* ---------------- NFC ---------------- */
 
   const startNfcScan = async () => {
     const nfc = getNfc();
@@ -77,352 +77,192 @@ export default function TapScreen() {
       );
       return;
     }
-    const NfcManager = nfc.default;
-
     if (!settings?.nfc_enabled) {
-      Alert.alert(
-        "NFC Disabled",
-        "Enable NFC in Settings to use tap feature"
-      );
+      Alert.alert("NFC is off", "Turn on NFC in Settings to tap cards.");
       return;
     }
-
+    const NfcManager = nfc.default;
     try {
-      if (Platform.OS === "ios") {
-        Alert.alert("Ready", "Hold your phone near the NFC card");
-      }
-
+      setScanning(true);
+      if (Platform.OS === "ios") Alert.alert("Ready", "Hold your phone near the NFC card");
       await NfcManager.requestTechnology(nfc.NfcTech.Ndef);
-
       const tag = await NfcManager.getTag();
-      const uid = tag?.id;
-
-      if (!uid) throw new Error("No NFC UID");
-
-      const res = await resolveNfc(uid);
+      if (!tag?.id) throw new Error("No NFC UID");
+      const res = await resolveNfc(tag.id);
       setConnectedProfile(res.data);
       setShowModal(true);
     } catch (err) {
       console.log("NFC Error:", err);
     } finally {
+      setScanning(false);
       NfcManager.cancelTechnologyRequest().catch(() => {});
     }
   };
-
-  /* ---------------- SAVE CONTACT ---------------- */
 
   const handleSave = async () => {
     try {
       await saveContact({ profile_id: connectedProfile.id });
       setShowModal(false);
-
-      router.push({
-        pathname: "/profile/[id]",
-        params: { id: connectedProfile.slug },
-      });
+      router.push({ pathname: "/profile/[id]", params: { id: connectedProfile.slug } });
     } catch {
-      Alert.alert("Error", "Unable to save contact");
+      Alert.alert("Couldn't save", "Please try again.");
     }
   };
 
-  /* ---------------- UI ---------------- */
+  const copyLink = async () => {
+    if (!myLink) return;
+    await Clipboard.setStringAsync(myLink);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  };
 
   return (
     <SafeScreen>
       <View style={styles.container}>
-        <Text style={[styles.title, { color: colors.text }]}>
-          Hold near card
-        </Text>
+        <ScreenHeader large title="Tap" subtitle="Exchange cards in person" />
 
-        <Text style={[styles.subtitle, { color: colors.subText }]}>
-          Bring your phone close to an NFC tag
-        </Text>
-
-        {/* NFC PULSE */}
-        <TouchableOpacity activeOpacity={0.9} onPress={startNfcScan}>
-          <View style={styles.pulseWrapper}>
-            <Animated.View
-              style={[
-                styles.pulseRing,
-                {
-                  backgroundColor: colors.primary,
-                  transform: [{ scale: pulse }],
-                },
-              ]}
-            />
-            <View
-              style={[
-                styles.centerCircle,
-                {
-                  backgroundColor: colors.bg,
-                  borderColor: colors.primary,
-                },
-              ]}
-            >
-              <Ionicons
-                name="briefcase-outline"
-                size={36}
-                color={colors.primary}
-              />
+        {/* NFC */}
+        <View style={styles.hero}>
+          <Pressable
+            onPress={startNfcScan}
+            accessibilityRole="button"
+            accessibilityLabel="Read an NFC card"
+            style={styles.pulseWrap}
+          >
+            <Animated.View style={[styles.ring, { backgroundColor: colors.primary }, ringA]} />
+            <Animated.View style={[styles.ring, { backgroundColor: colors.primary }, ringB]} />
+            <View style={[styles.core, { backgroundColor: colors.primary }]}>
+              <Ionicons name={scanning ? "radio" : "radio-outline"} size={44} color={colors.onPrimary} />
             </View>
-          </View>
-        </TouchableOpacity>
-
-        {/* SHOW QR */}
-        <TouchableOpacity
-          style={[
-            styles.qrButton,
-            { backgroundColor: colors.card },
-          ]}
-          onPress={() => setShowQr(true)}
-        >
-          <Text style={[styles.qrButtonText, { color: colors.text }]}>
-            Show QR Code
+          </Pressable>
+          <Text style={[Type.title, { color: colors.text, marginTop: Space.lg }]}>
+            {scanning ? "Listening…" : "Hold near a card"}
           </Text>
-        </TouchableOpacity>
+          <Text style={[styles.hint, { color: colors.subText }]}>
+            Tap the circle, then bring your phone to an NFC business card or tag.
+          </Text>
+        </View>
 
-        {/* QR MODAL */}
-        <Modal visible={showQr} transparent animationType="fade">
-          <View style={styles.modalOverlay}>
-            <View
-              style={[
-                styles.qrCard,
-                { backgroundColor: colors.card },
-              ]}
-            >
-              <Text style={[styles.qrTitle, { color: colors.text }]}>
-                Scan to connect
-              </Text>
-
-              <QRCode
-                value={publicProfileUrl(connectedProfile?.slug || "me", "qr")}
-                size={160}
-                color="#000"
-                backgroundColor="#FFF"
-              />
-
-              <TouchableOpacity
-                onPress={() =>
-                  Clipboard.setStringAsync(
-                    publicProfileUrl(connectedProfile?.slug || "me", "link")
-                  )
-                }
-              >
-                <Text
-                  style={[
-                    styles.qrLink,
-                    { color: colors.primary },
-                  ]}
-                >
-                  {publicProfileUrl(connectedProfile?.slug || "me").replace(/^https?:\/\//, "")}
-                </Text>
-              </TouchableOpacity>
-
-              <Text style={[styles.qrHint, { color: colors.subText }]}>
-                Tap link to copy
-              </Text>
-
-              <TouchableOpacity onPress={() => setShowQr(false)}>
-                <Text
-                  style={[styles.dismiss, { color: colors.subText }]}
-                >
-                  Close
-                </Text>
-              </TouchableOpacity>
-            </View>
+        {/* MY QR */}
+        <Surface style={styles.qrRow} onPress={() => setShowQr(true)} accessibilityLabel="Show my QR code">
+          <View style={[styles.qrIcon, { backgroundColor: colors.primarySoft }]}>
+            <Ionicons name="qr-code" size={22} color={colors.primary} />
           </View>
-        </Modal>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.rowTitle, { color: colors.text }]}>Show my QR code</Text>
+            <Text style={[styles.rowSub, { color: colors.subText }]}>For phones without NFC</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.subText} />
+        </Surface>
+      </View>
 
-        {/* SUCCESS MODAL */}
-        <Modal visible={showModal} transparent animationType="fade">
-          <View style={styles.modalOverlay}>
-            <View
-              style={[
-                styles.modalCard,
-                { backgroundColor: colors.card },
-              ]}
-            >
-              <View style={styles.successCircle}>
-                <Ionicons name="checkmark" size={30} color="#000" />
-              </View>
-
-              <Text style={[styles.modalTitle, { color: colors.text }]}>
-                Connection Found!
-              </Text>
-
-              <View
-                style={[
-                  styles.profileCard,
-                  { backgroundColor: colors.bg },
-                ]}
-              >
-                <Image
-                  source={{ uri: connectedProfile?.avatar }}
-                  style={styles.avatar}
-                />
-                <View>
-                  <Text style={[styles.name, { color: colors.text }]}>
-                    {connectedProfile?.full_name}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.role,
-                      { color: colors.subText },
-                    ]}
-                  >
-                    {connectedProfile?.job_title}
+      {/* QR SHEET */}
+      <Modal visible={showQr} transparent animationType="fade" onRequestClose={() => setShowQr(false)}>
+        <Pressable style={styles.overlay} onPress={() => setShowQr(false)}>
+          <Pressable style={[styles.sheet, { backgroundColor: colors.card }]}>
+            <Text style={[Type.title, { color: colors.text }]}>Scan to connect</Text>
+            <Text style={[styles.hint, { color: colors.subText, marginBottom: Space.xl }]}>
+              {activeCard?.display_name ?? "Your card"}
+              {activeCard?.label ? ` · ${activeCard.label}` : ""}
+            </Text>
+            <View style={styles.qrFrame}>
+              {myLink ? (
+                <QRCode value={publicProfileUrl(mySlug, "qr")} size={200} color="#111" backgroundColor="#FFF" />
+              ) : (
+                <Text style={{ color: "#666", width: 200, textAlign: "center" }}>Create your card first</Text>
+              )}
+            </View>
+            {myLink ? (
+              <Pressable onPress={copyLink} accessibilityRole="button" accessibilityLabel="Copy card link">
+                <View style={[styles.linkPill, { backgroundColor: colors.primarySoft }]}>
+                  <Ionicons name={copied ? "checkmark" : "copy-outline"} size={15} color={colors.primary} />
+                  <Text style={[styles.linkText, { color: colors.primary }]} numberOfLines={1}>
+                    {copied ? "Link copied" : myLink.replace(/^https?:\/\//, "").replace(/\?.*$/, "")}
                   </Text>
                 </View>
-              </View>
+              </Pressable>
+            ) : null}
+            <Button title="Done" variant="secondary" onPress={() => setShowQr(false)} style={{ marginTop: Space.xl, alignSelf: "stretch" }} />
+          </Pressable>
+        </Pressable>
+      </Modal>
 
-              <TouchableOpacity
-                style={[
-                  styles.saveButton,
-                  { backgroundColor: colors.primary },
-                ]}
-                onPress={handleSave}
-              >
-                <Text style={styles.saveText}>Save to Network</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity onPress={() => setShowModal(false)}>
-                <Text
-                  style={[styles.dismiss, { color: colors.subText }]}
-                >
-                  Dismiss
-                </Text>
-              </TouchableOpacity>
+      {/* CONNECTION FOUND */}
+      <Modal visible={showModal} transparent animationType="fade" onRequestClose={() => setShowModal(false)}>
+        <View style={styles.overlay}>
+          <View style={[styles.sheet, { backgroundColor: colors.card }]}>
+            <View style={[styles.success, { backgroundColor: colors.success }]}>
+              <Ionicons name="checkmark" size={30} color="#FFF" />
             </View>
+            <Text style={[Type.title, { color: colors.text, marginBottom: Space.lg }]}>Card found</Text>
+            <View style={[styles.person, { backgroundColor: colors.elevated, borderColor: colors.border }]}>
+              <Avatar uri={assetUrl(connectedProfile?.avatar_url ?? connectedProfile?.avatar)} name={connectedProfile?.full_name} size={48} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={1}>
+                  {connectedProfile?.full_name}
+                </Text>
+                {connectedProfile?.job_title ? (
+                  <Text style={[styles.rowSub, { color: colors.subText }]} numberOfLines={1}>
+                    {connectedProfile.job_title}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+            <Button title="Save to network" icon="person-add-outline" onPress={handleSave} style={{ alignSelf: "stretch" }} />
+            <Button title="Not now" variant="ghost" onPress={() => setShowModal(false)} style={{ alignSelf: "stretch", marginTop: 4 }} />
           </View>
-        </Modal>
-      </View>
+        </View>
+      </Modal>
     </SafeScreen>
   );
 }
 
-/* ---------------- STYLES (NO COLORS HERE) ---------------- */
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    paddingTop: 80,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: "700",
-  },
-  subtitle: {
-    fontSize: 14,
-    marginTop: 6,
-  },
-  pulseWrapper: {
-    marginTop: 60,
-    width: 220,
-    height: 220,
+  container: { flex: 1, padding: Space.lg },
+  hero: { flex: 1, alignItems: "center", justifyContent: "center", paddingBottom: Space.xl },
+  pulseWrap: { width: 240, height: 240, alignItems: "center", justifyContent: "center" },
+  ring: { position: "absolute", width: 240, height: 240, borderRadius: 120 },
+  core: {
+    width: 112,
+    height: 112,
+    borderRadius: 56,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
   },
-  pulseRing: {
-    position: "absolute",
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-  },
-  centerCircle: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-  },
-  qrButton: {
-    marginTop: 80,
-    paddingHorizontal: 26,
-    paddingVertical: 12,
-    borderRadius: 22,
-  },
-  qrButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.7)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalCard: {
-    width: "80%",
-    borderRadius: 20,
-    padding: 24,
-    alignItems: "center",
-  },
-  successCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#22C55E",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 16,
-  },
-  profileCard: {
+  hint: { fontSize: 15, textAlign: "center", marginTop: 6, lineHeight: 21, maxWidth: 300 },
+  qrRow: { flexDirection: "row", alignItems: "center", gap: Space.md, marginBottom: 96 },
+  qrIcon: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  rowTitle: { fontSize: 16, fontWeight: "700" },
+  rowSub: { fontSize: 13, marginTop: 2 },
+
+  overlay: { flex: 1, backgroundColor: "rgba(20,16,10,0.55)", alignItems: "center", justifyContent: "center", padding: Space.xl },
+  sheet: { width: "100%", maxWidth: 380, borderRadius: Radius.sheet, padding: Space.xl, alignItems: "center" },
+  qrFrame: { padding: 16, backgroundColor: "#FFF", borderRadius: 18 },
+  linkPill: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 14,
-    padding: 12,
-    width: "100%",
-    marginBottom: 20,
+    gap: 6,
+    marginTop: Space.lg,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: Radius.pill,
+    maxWidth: 300,
   },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    marginRight: 12,
-  },
-  name: {
-    fontWeight: "600",
-  },
-  role: {
-    fontSize: 12,
-  },
-  saveButton: {
-    paddingVertical: 12,
-    borderRadius: 10,
-    width: "100%",
+  linkText: { fontSize: 13, fontWeight: "600", flexShrink: 1 },
+  success: { width: 60, height: 60, borderRadius: 30, alignItems: "center", justifyContent: "center", marginBottom: Space.lg },
+  person: {
+    flexDirection: "row",
     alignItems: "center",
-  },
-  saveText: {
-    color: "#000",
-    fontWeight: "600",
-  },
-  dismiss: {
-    marginTop: 14,
-  },
-  qrCard: {
-    borderRadius: 20,
-    padding: 24,
-    alignItems: "center",
-    width: "80%",
-  },
-  qrTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    marginBottom: 16,
-  },
-  qrLink: {
-    marginTop: 12,
-    fontSize: 13,
-  },
-  qrHint: {
-    fontSize: 11,
-    marginTop: 4,
+    gap: Space.md,
+    alignSelf: "stretch",
+    padding: Space.md,
+    borderRadius: Radius.card,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: Space.lg,
   },
 });

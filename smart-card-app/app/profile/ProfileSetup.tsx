@@ -255,7 +255,7 @@ useEffect(() => {
       },
     ]}
   >
-    <Text style={styles.primaryText}>
+    <Text style={[styles.primaryText, { color: colors.onPrimary }]}>
       {saving ? "Saving..." : "Save & Continue"}
     </Text>
   </TouchableOpacity>

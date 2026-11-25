@@ -1,226 +1,88 @@
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-} from "react-native";
-import { useLocalSearchParams, router } from "expo-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { Alert, TextInputInstance, View } from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
 import { resetPassword } from "../../services/authService";
-import { Ionicons } from "@expo/vector-icons";
+import AuthLayout, { FormError } from "@/components/ui/AuthLayout";
+import Button from "@/components/ui/Button";
+import CodeInput from "@/components/ui/CodeInput";
+import TextField from "@/components/ui/TextField";
 
 export default function ResetPasswordScreen() {
   const { identifier } = useLocalSearchParams<{ identifier: string }>();
-
   const [otp, setOtp] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
-
-const [showPassword, setShowPassword] = useState(false);
-const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const confirmRef = useRef<TextInputInstance>(null);
 
   const handleReset = async () => {
-    if (!otp || !password || !confirmPassword) {
-      Alert.alert("Error", "All fields are required");
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      Alert.alert("Error", "Passwords do not match");
-      return;
-    }
+    if (otp.length !== 6) return setError("Enter the 6-digit code from your email");
+    if (password.length < 8) return setError("Use at least 8 characters for the new password");
+    if (password !== confirmPassword) return setError("Passwords don't match");
 
     try {
       setLoading(true);
+      setError(null);
       await resetPassword(identifier!, otp, password);
-
-      Alert.alert("Success", "Password reset successfully");
+      Alert.alert("Password updated", "Sign in with your new password.");
       router.replace("/login");
-
     } catch (err: any) {
-      Alert.alert(
-        "Error",
-        err?.response?.data?.detail || "Reset failed"
-      );
+      const detail = err?.response?.data?.detail;
+      setError(typeof detail === "string" ? detail : "Reset failed. Check the code and try again.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView
-         style={{ flex: 1 }}
-         behavior={Platform.OS === "ios" ? "padding" : "height"}
-       >
-         <ScrollView
-           contentContainerStyle={styles.container}
-           keyboardShouldPersistTaps="handled"
-           showsVerticalScrollIndicator={false}
-         >
-           <View style={styles.card}>
-        <Text style={styles.title}>Reset Password</Text>
-        <Text style={styles.subtitle}>
-          Enter OTP and set a new password.
-        </Text>
-
-        <TextInput
-          placeholder="OTP"
-          keyboardType="number-pad"
-          value={otp}
-          onChangeText={setOtp}
-          style={styles.input}
-        />
-
-        <View style={styles.passwordWrapper}>
-  <TextInput
-    placeholder="New password"
-    secureTextEntry={!showPassword}
-    value={password}
-    onChangeText={setPassword}
-    style={styles.passwordInput}
-  />
-
-  <TouchableOpacity
-    onPress={() => setShowPassword(!showPassword)}
-    style={styles.eyeButton}
-    activeOpacity={0.7}
-  >
-    <Ionicons
-      name={showPassword ? "eye-off" : "eye"}
-      size={22}
-      color="#64748B"
-    />
-  </TouchableOpacity>
-</View>
-
-
-        <View style={styles.passwordWrapper}>
-  <TextInput
-    placeholder="Confirm password"
-    secureTextEntry={!showConfirmPassword}
-    value={confirmPassword}
-    onChangeText={setConfirmPassword}
-    style={styles.passwordInput}
-  />
-
-  <TouchableOpacity
-    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-    style={styles.eyeButton}
-    activeOpacity={0.7}
-  >
-    <Ionicons
-      name={showConfirmPassword ? "eye-off" : "eye"}
-      size={22}
-      color="#64748B"
-    />
-  </TouchableOpacity>
-</View>
-
-
-        <TouchableOpacity
-          style={styles.primaryButton}
-          onPress={handleReset}
-          disabled={loading}
-        >
-          <Text style={styles.primaryText}>
-            {loading ? "Resetting..." : "Reset Password"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
-    </KeyboardAvoidingView>
+    <AuthLayout
+      icon="shield-checkmark-outline"
+      title="Set a new password"
+      subtitle={identifier ? `Enter the code sent to ${identifier}` : "Enter the code from your email"}
+      onBack={() => router.back()}
+    >
+      <CodeInput
+        value={otp}
+        onChange={(v) => {
+          setOtp(v);
+          setError(null);
+        }}
+      />
+      <View style={{ height: 20 }} />
+      <TextField
+        label="New password"
+        icon="lock-closed-outline"
+        placeholder="At least 8 characters"
+        password
+        value={password}
+        onChangeText={(v) => {
+          setPassword(v);
+          setError(null);
+        }}
+        autoComplete="new-password"
+        textContentType="newPassword"
+        returnKeyType="next"
+        onSubmitEditing={() => confirmRef.current?.focus()}
+      />
+      <TextField
+        ref={confirmRef}
+        label="Confirm new password"
+        icon="lock-closed-outline"
+        placeholder="Type it again"
+        password
+        value={confirmPassword}
+        onChangeText={(v) => {
+          setConfirmPassword(v);
+          setError(null);
+        }}
+        autoComplete="new-password"
+        textContentType="newPassword"
+        returnKeyType="go"
+        onSubmitEditing={handleReset}
+      />
+      <FormError message={error} />
+      <Button title="Update password" onPress={handleReset} loading={loading} />
+    </AuthLayout>
   );
 }
-
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#0F172A",
-    justifyContent: "center",
-    padding: 20,
-  },
-
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    padding: 24,
-  },
-
-  title: {
-    fontSize: 26,
-    fontWeight: "700",
-    textAlign: "center",
-    marginBottom: 6,
-    color: "#020617",
-  },
-
-  subtitle: {
-    textAlign: "center",
-    color: "#64748B",
-    marginBottom: 20,
-    fontSize: 14,
-  },
-
-  input: {
-    borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 12,
-    fontSize: 15,
-    backgroundColor: "#FFFFFF",
-    color: "#020617",
-  },
-
-  primaryButton: {
-  backgroundColor: "#2563EB",
-  padding: 16,
-  borderRadius: 12,
-  marginTop: 6,
-},
-
-
-  primaryText: {
-    color: "#FFFFFF",
-    textAlign: "center",
-    fontWeight: "600",
-    fontSize: 16,
-  },
-
-  link: {
-    color: "#2563EB",
-    textAlign: "center",
-    marginTop: 16,
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  passwordWrapper: {
-  flexDirection: "row",
-  alignItems: "center",
-  borderWidth: 1,
-  borderColor: "#CBD5E1",
-  borderRadius: 12,
-  backgroundColor: "#FFFFFF",
-  paddingHorizontal: 14,
-  marginBottom: 12,
-},
-
-passwordInput: {
-  flex: 1,
-  paddingVertical: 14,
-  fontSize: 15,
-  color: "#020617",
-},
-
-eyeButton: {
-  paddingLeft: 8,
-},
-
-});

@@ -1,39 +1,46 @@
-import { View, Text, TextInput, Button, StyleSheet, Alert } from "react-native";
-import { useState } from "react";
-import { useLocalSearchParams, router } from "expo-router";
+import { useEffect, useState } from "react";
+import { Text, View } from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
 import api from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
+import { useApp } from "@/components/context/AppContext";
+import AuthLayout, { AuthLink, FormError } from "@/components/ui/AuthLayout";
+import Button from "@/components/ui/Button";
+import CodeInput from "@/components/ui/CodeInput";
+
+const RESEND_SECONDS = 30;
 
 export default function VerifyEmail() {
-  const { userId } = useLocalSearchParams<{ userId: string }>();
+  const { userId, email } = useLocalSearchParams<{ userId: string; email?: string }>();
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [cooldown, setCooldown] = useState(RESEND_SECONDS);
   const { login } = useAuth();
+  const { colors } = useApp();
 
-  const handleVerify = async () => {
-    if (otp.length !== 6) {
-      Alert.alert("Invalid OTP", "Please enter the 6-digit code");
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
+
+  const handleVerify = async (code = otp) => {
+    if (code.length !== 6) {
+      setError("Enter the 6-digit code");
       return;
     }
-
     try {
       setLoading(true);
-
-      const res = await api.post("/auth/verify-email", {
-        user_id: userId,
-        otp,
-      });
-
-      // 🔑 save token
+      setError(null);
+      const res = await api.post("/auth/verify-email", { user_id: userId, otp: code });
       await login(res.data.access_token);
-
-      // 🚀 go directly to profile setup
       router.replace("/profile/ProfileSetup");
     } catch (err: any) {
-      Alert.alert(
-        "Verification Failed",
-        err?.response?.data?.detail || "Invalid or expired OTP"
-      );
+      const detail = err?.response?.data?.detail;
+      setError(typeof detail === "string" ? detail : "That code is wrong or has expired");
+      setOtp("");
     } finally {
       setLoading(false);
     }
@@ -41,78 +48,48 @@ export default function VerifyEmail() {
 
   const handleResend = async () => {
     try {
+      setError(null);
       await api.post("/auth/resend-email-otp", { user_id: userId });
-      Alert.alert("OTP Sent", "A new OTP has been sent to your email");
+      setNotice("A new code is on its way.");
+      setCooldown(RESEND_SECONDS);
     } catch {
-      Alert.alert("Error", "Unable to resend OTP. Try again later.");
+      setError("Couldn't resend the code. Try again in a moment.");
     }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Verify Email</Text>
-      <Text style={styles.subtitle}>
-        Enter the 6-digit code sent to your email
-      </Text>
-
-      <TextInput
+    <AuthLayout
+      icon="mail-open-outline"
+      title="Check your email"
+      subtitle={
+        email
+          ? `Enter the 6-digit code we sent to ${email}`
+          : "Enter the 6-digit code we sent to your email"
+      }
+      onBack={() => router.back()}
+      footer={
+        cooldown > 0 ? (
+          <Text style={{ color: colors.subText, fontSize: 14 }}>Resend code in {cooldown}s</Text>
+        ) : (
+          <AuthLink text="Didn't get it?" action="Resend code" onPress={handleResend} />
+        )
+      }
+    >
+      <CodeInput
         value={otp}
-        onChangeText={setOtp}
-        keyboardType="numeric"
-        placeholder="••••••"
-        maxLength={6}
-        style={styles.input}
-        textAlign="center"
+        onChange={(v) => {
+          setOtp(v);
+          setError(null);
+        }}
+        onComplete={(v) => handleVerify(v)}
+        error={!!error}
       />
-
-      <View style={styles.button}>
-        <Button
-          title={loading ? "Verifying..." : "Verify OTP"}
-          onPress={handleVerify}
-          disabled={loading}
-        />
-      </View>
-
-      <View style={styles.resend}>
-        <Button title="Resend OTP" onPress={handleResend} />
-      </View>
-    </View>
+      <View style={{ height: 20 }} />
+      {notice && !error ? (
+        <Text style={{ color: colors.success, textAlign: "center", marginBottom: 12 }}>{notice}</Text>
+      ) : null}
+      <FormError message={error} />
+      <Button title="Verify" onPress={() => handleVerify()} loading={loading} disabled={otp.length !== 6} />
+    </AuthLayout>
   );
 }
-
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 24,
-    justifyContent: "center",
-    backgroundColor: "#fff",
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: "600",
-    textAlign: "center",
-    marginBottom: 6,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "#666",
-    textAlign: "center",
-    marginBottom: 24,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 10,
-    paddingVertical: 14,
-    fontSize: 18,
-    letterSpacing: 8,
-    marginBottom: 24,
-  },
-  button: {
-    marginBottom: 12,
-  },
-  resend: {
-    marginTop: 6,
-  },
-});

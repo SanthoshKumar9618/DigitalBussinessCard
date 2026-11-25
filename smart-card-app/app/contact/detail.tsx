@@ -15,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useApp } from "@/components/context/AppContext";
 import SafeScreen from "@/components/ui/Screen1";
+import Button from "@/components/ui/Button";
 import { deleteContact } from "@/services/contactService";
 import { useRefresh } from "@/components/context/RefreshContext";
 import { BASE_URL } from "@/services/api";
@@ -126,7 +127,7 @@ export default function ContactDetail() {
             style={styles.avatar}
           />
         ) : (
-          <View style={styles.avatarPlaceholder}>
+          <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primarySoft }]}>
             <Ionicons name="person" size={32} color={colors.subText} />
           </View>
         )}
@@ -333,13 +334,7 @@ export default function ContactDetail() {
         )}
 
         {/* DELETE */}
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={handleDelete}
-        >
-          <Ionicons name="trash-outline" size={18} color="#FFF" />
-          <Text style={styles.deleteButtonText}>Delete Contact</Text>
-        </TouchableOpacity>
+        <Button title="Delete contact" icon="trash-outline" variant="danger" onPress={handleDelete} style={{ marginTop: 32 }} />
       </ScrollView>
     </SafeScreen>
   );
@@ -395,7 +390,7 @@ function SocialButton({ icon, label, onPress, colors }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16 },
   avatar: { width: 120, height: 120, borderRadius: 60, alignSelf: "center", marginVertical: 20 },
-  avatarPlaceholder: { width: 120, height: 120, borderRadius: 60, alignSelf: "center", marginVertical: 20, backgroundColor: "#2A2A2A", justifyContent: "center", alignItems: "center" },
+  avatarPlaceholder: { width: 120, height: 120, borderRadius: 60, alignSelf: "center", marginVertical: 20, justifyContent: "center", alignItems: "center" },
   name: { fontSize: 24, fontWeight: "700", textAlign: "center" },
   role: { textAlign: "center", marginTop: 6 },
   company: { textAlign: "center", marginTop: 2 },

@@ -1,385 +1,201 @@
-import {
-  ScrollView,
-  View,
-  Text,
-  TouchableOpacity,
-  Switch,
-  StyleSheet,
-  Alert,
-  Modal,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
-import { getPlan } from "@/services/integrationsService";
-import { logout } from "../../services/authService";
+import { Alert, Platform, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import { getPlan } from "@/services/integrationsService";
+import { useAuth } from "@/context/AuthContext";
+import { useCards } from "@/context/CardContext";
 import { useApp } from "../../components/context/AppContext";
-import { LANGUAGES } from "../../constants/i18n";
+import { LANGUAGES, LanguageCode } from "../../constants/i18n";
 import SafeScreen from "@/components/ui/Screen1";
-
-/* ---------------- SCREEN ---------------- */
+import Button from "@/components/ui/Button";
+import { Avatar, ListRow, Loading, OptionSheet, ScreenHeader, SectionLabel, Surface } from "@/components/ui/kit";
+import { assetUrl } from "@/services/api";
+import { Space } from "@/constants/design";
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const { logout } = useAuth();
+  const { activeCard } = useCards();
+  const { settings, loading, updateSetting, colors, theme, setOpenEditProfile, t } = useApp();
+
   const [planName, setPlanName] = useState<string | null>(null);
-  useEffect(() => {
-    getPlan().then((p) => setPlanName(p.plan.name)).catch(() => {});
-  }, []);
-
-  const {
-    settings,
-    loading,
-    updateSetting,
-    colors,
-    setOpenEditProfile,
-    t,
-  } = useApp();
-
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [showLangPicker, setShowLangPicker] = useState(false);
-  const [showTemplateModal, setShowTemplateModal] = useState(false);
 
-  if (loading || !settings) return null;
+  useEffect(() => {
+    getPlan()
+      .then((p) => setPlanName(p.plan.name))
+      .catch(() => {});
+  }, []);
 
-  /* ---------- LOGOUT ---------- */
+  if (loading || !settings) {
+    return (
+      <SafeScreen>
+        <Loading />
+      </SafeScreen>
+    );
+  }
+
   const handleLogout = () => {
-    Alert.alert("Logout", "Are you sure you want to logout?", [
+    const doLogout = async () => {
+      // Clears the saved token too; the root screen then shows sign-in.
+      await logout();
+      router.replace("/(auth)/login");
+    };
+    if (Platform.OS === "web") {
+      doLogout();
+      return;
+    }
+    Alert.alert("Sign out?", "You can sign back in any time.", [
       { text: "Cancel", style: "cancel" },
-      {
-        text: "Logout",
-        style: "destructive",
-        onPress: async () => {
-          await logout();
-          router.replace("/(auth)/login");
-        },
-      },
+      { text: "Sign out", style: "destructive", onPress: doLogout },
     ]);
   };
 
+  const toggle = (value: boolean, onChange: (v: boolean) => void, label: string) => (
+    <Switch
+      value={value}
+      onValueChange={onChange}
+      accessibilityLabel={label}
+      trackColor={{ false: colors.border, true: colors.primary }}
+      thumbColor="#FFFFFF"
+      {...(Platform.OS === "web" ? ({ activeThumbColor: "#FFFFFF" } as any) : {})}
+    />
+  );
+
+  const languageName = LANGUAGES[(settings.language as LanguageCode) || "en"]?.name ?? "English";
+
   return (
-    <>
     <SafeScreen>
-      <ScrollView
-        style={{ flex: 1, backgroundColor: colors.bg }}
-        contentContainerStyle={{ paddingBottom: 40 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={[styles.title, { color: colors.text }]}>
-          {t("settings")}
-        </Text>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <ScreenHeader large title={t("settings")} />
 
-        {/* ACCOUNT */}
-        <SettingsSection title="Account" colors={colors}>
-          <SettingsRow
-            label="Edit Profile"
-            colors={colors}
-            onPress={() => {
-              setOpenEditProfile(true);
-              router.push("/(tabs)/profile");
-            }}
-          />
+        {/* PROFILE CARD */}
+        <Surface
+          style={styles.profile}
+          onPress={() => {
+            setOpenEditProfile(true);
+            router.push("/(tabs)/profile");
+          }}
+          accessibilityLabel="Edit profile"
+        >
+          <Avatar uri={assetUrl(activeCard?.avatar_url)} name={activeCard?.display_name} size={52} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.profileName, { color: colors.text }]} numberOfLines={1}>
+              {activeCard?.display_name || "Your profile"}
+            </Text>
+            <Text style={[styles.profileSub, { color: colors.subText }]} numberOfLines={1}>
+              {planName ? `${planName} plan · ` : ""}Edit profile
+            </Text>
+          </View>
+        </Surface>
 
-          <SettingsToggle
-            label="Public Profile"
-            value={settings.public_profile}
-            onChange={(v: boolean) => updateSetting("public_profile", v)}
-            colors={colors}
+        <SectionLabel>Privacy</SectionLabel>
+        <Surface style={styles.group}>
+          <ListRow
+            icon="globe-outline"
+            title="Public profile"
+            subtitle="Anyone with your link can view your card"
+            right={toggle(settings.public_profile, (v) => updateSetting("public_profile", v), "Public profile")}
           />
+          <ListRow
+            icon="call-outline"
+            title="Show phone number"
+            right={toggle(settings.show_phone, (v) => updateSetting("show_phone", v), "Show phone number")}
+          />
+          <ListRow
+            icon="mail-outline"
+            title="Show email address"
+            right={toggle(settings.show_email, (v) => updateSetting("show_email", v), "Show email address")}
+            last
+          />
+        </Surface>
 
-          <SettingsToggle
-            label="Show Phone Number"
-            value={settings.show_phone}
-            onChange={(v: boolean) => updateSetting("show_phone", v)}
-            colors={colors}
+        <SectionLabel>Sharing</SectionLabel>
+        <Surface style={styles.group}>
+          <ListRow icon="albums-outline" title="My cards" subtitle="Work, personal and more" onPress={() => router.push("/cards")} />
+          <ListRow icon="link-outline" title="Card link & custom links" onPress={() => router.push("/share-kit")} />
+          <ListRow icon="mail-unread-outline" title="Email signature & Wallet" onPress={() => router.push("/share-kit")} />
+          <ListRow
+            icon="qr-code-outline"
+            title="Show my QR code"
+            onPress={() => router.push({ pathname: "/(tabs)/tap", params: { showQr: "true" } })}
           />
+          <ListRow
+            icon="radio-outline"
+            title="NFC tap"
+            right={toggle(settings.nfc_enabled, (v) => updateSetting("nfc_enabled", v), "NFC tap")}
+          />
+          <ListRow
+            icon="water-outline"
+            title="SmartCard watermark"
+            subtitle="Small badge on your shared card"
+            right={toggle(settings.watermark_enabled, (v) => updateSetting("watermark_enabled", v), "Watermark")}
+            last
+          />
+        </Surface>
 
-          <SettingsToggle
-            label="Show Email Address"
-            value={settings.show_email}
-            onChange={(v: boolean) => updateSetting("show_email", v)}
-            colors={colors}
-          />
-        </SettingsSection>
-
-        {/* BUSINESS */}
-        <SettingsSection title={planName ? `Business · ${planName} plan` : "Business"} colors={colors}>
-          <SettingsRow
-            label="Team (members, branding, leaderboard)"
-            colors={colors}
-            onPress={() => router.push("/team")}
-          />
-          <SettingsRow
-            label="Integrations (HubSpot, Zapier, webhooks)"
-            colors={colors}
+        <SectionLabel>Business</SectionLabel>
+        <Surface style={styles.group}>
+          <ListRow icon="stats-chart-outline" title="Insights" subtitle="Views, saves and leads" onPress={() => router.push("/insights")} />
+          <ListRow icon="people-outline" title="Team" subtitle="Members, branding, leaderboard" onPress={() => router.push("/team")} />
+          <ListRow
+            icon="git-network-outline"
+            title="Integrations"
+            subtitle="HubSpot, Zapier, webhooks"
             onPress={() => router.push("/integrations")}
+            last
           />
-        </SettingsSection>
+        </Surface>
 
-        {/* SHARE KIT */}
-        <SettingsSection title="Share kit" colors={colors}>
-          <SettingsRow
-            label="My cards (work, personal…)"
-            colors={colors}
-            onPress={() => router.push("/cards")}
-          />
-          <SettingsRow
-            label="Card link & custom links"
-            colors={colors}
-            onPress={() => router.push("/share-kit")}
-          />
-          <SettingsRow
-            label="Email signature & Wallet"
-            colors={colors}
-            onPress={() => router.push("/share-kit")}
-          />
-          <SettingsRow
-            label="Insights"
-            colors={colors}
-            onPress={() => router.push("/insights")}
-          />
-        </SettingsSection>
-
-        {/* CARD & TEMPLATE */}
-        <SettingsSection title="Card & Template" colors={colors}>
-  <SettingsRow
-    label="Card Template"
-    colors={colors}
-    onPress={() => setShowTemplateModal(true)}
-  />
-
-  <SettingsToggle
-    label="Watermark on Card"
-    value={settings.watermark_enabled}
-    onChange={(v: boolean) =>
-      updateSetting("watermark_enabled", v)
-    }
-    colors={colors}
-  />
-</SettingsSection>
-
-
-        {/* QR & NFC */}
-        <SettingsSection title="QR & NFC" colors={colors}>
-          <SettingsRow
-            label="Show My QR Code"
-            colors={colors}
-            onPress={() =>
-              router.push({
-                pathname: "/(tabs)/tap",
-                params: { showQr: "true" },
-              })
-            }
-          />
-
-          <SettingsToggle
-            label="Enable NFC"
-            value={settings.nfc_enabled}
-            onChange={(v: boolean) => updateSetting("nfc_enabled", v)}
-            colors={colors}
-          />
-        </SettingsSection>
-
-        {/* PREFERENCES */}
-        <SettingsSection title="Preferences" colors={colors}>
-          <SettingsRow
-            label={t("theme")}
-            colors={colors}
+        <SectionLabel>App</SectionLabel>
+        <Surface style={styles.group}>
+          <ListRow
+            icon={theme === "dark" ? "moon-outline" : "sunny-outline"}
+            title={t("theme")}
             onPress={() => setShowThemePicker(true)}
+            right={<Text style={{ color: colors.subText }}>{theme === "dark" ? "Dark" : "Light"}</Text>}
           />
-
-          <SettingsRow
-            label={t("language")}
-            colors={colors}
+          <ListRow
+            icon="language-outline"
+            title={t("language")}
             onPress={() => setShowLangPicker(true)}
+            right={<Text style={{ color: colors.subText }}>{languageName}</Text>}
+            last
           />
-        </SettingsSection>
+        </Surface>
 
-        {/* SUPPORT */}
-        <SettingsSection title="Support" colors={colors}>
-          <SettingsRow label="Help & FAQ" colors={colors} />
-          <SettingsRow label="Privacy Policy" colors={colors} />
-          <SettingsRow label="About App" colors={colors} />
-        </SettingsSection>
-
-        {/* LOGOUT */}
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
+        <Button title="Sign out" variant="danger" icon="log-out-outline" onPress={handleLogout} style={{ marginTop: Space.xxl }} />
       </ScrollView>
 
-      {/* THEME MODAL */}
-      <Modal visible={showThemePicker} transparent animationType="fade">
-        <ModalCard colors={colors}>
-          {["dark", "light"].map((mode) => (
-            <ModalItem
-              key={mode}
-              label={mode === "dark" ? "Dark" : "Light"}
-              onPress={() => {
-                updateSetting("theme", mode);
-                setShowThemePicker(false);
-              }}
-              colors={colors}
-            />
-          ))}
-        </ModalCard>
-      </Modal>
-
-      {/* LANGUAGE MODAL */}
-      <Modal visible={showLangPicker} transparent animationType="fade">
-        <ModalCard colors={colors}>
-          {Object.entries(LANGUAGES).map(([key, value]) => (
-            <ModalItem
-              key={key}
-              label={value.name}
-              onPress={() => {
-                updateSetting("language", key);
-                setShowLangPicker(false);
-              }}
-              colors={colors}
-            />
-          ))}
-        </ModalCard>
-      </Modal>
-      </SafeScreen>
-    </>
-  );
-}
-
-/* ---------------- REUSABLE COMPONENTS ---------------- */
-
-function SettingsSection({ title, colors, children }: any) {
-  return (
-    <View
-      style={[
-        styles.section,
-        { backgroundColor: colors.card, borderColor: colors.border },
-      ]}
-    >
-      <Text style={[styles.sectionTitle, { color: colors.subText }]}>
-        {title}
-      </Text>
-      {children}
-    </View>
-  );
-}
-
-function SettingsRow({ label, onPress, colors }: any) {
-  return (
-    <TouchableOpacity
-      style={[
-        styles.row,
-        { backgroundColor: colors.card, borderTopColor: colors.border },
-      ]}
-      onPress={onPress}
-      disabled={!onPress}
-    >
-      <Text style={{ color: colors.text }}>{label}</Text>
-      {onPress && (
-        <Ionicons name="chevron-forward" size={18} color={colors.subText} />
-      )}
-    </TouchableOpacity>
-  );
-}
-
-type SettingsToggleProps = {
-  label: string;
-  value: boolean;
-  onChange: (value: boolean) => void;
-  colors: any;
-};
-
-function SettingsToggle({
-  label,
-  value,
-  onChange,
-  colors,
-}: SettingsToggleProps) {
-
-  return (
-    <View
-      style={[
-        styles.row,
-        { backgroundColor: colors.card, borderTopColor: colors.border },
-      ]}
-    >
-      <Text style={{ color: colors.text }}>{label}</Text>
-      <Switch
-        value={value}
-        onValueChange={onChange}
-        trackColor={{ false: colors.border, true: colors.primary }}
-        thumbColor="#FFFFFF"
+      <OptionSheet
+        visible={showThemePicker}
+        title={t("theme")}
+        value={theme}
+        options={[
+          { value: "light", label: "Light", icon: "sunny-outline" },
+          { value: "dark", label: "Dark", icon: "moon-outline" },
+        ]}
+        onSelect={(v) => updateSetting("theme", v)}
+        onClose={() => setShowThemePicker(false)}
       />
-    </View>
+
+      <OptionSheet
+        visible={showLangPicker}
+        title={t("language")}
+        value={(settings.language as LanguageCode) || "en"}
+        options={Object.entries(LANGUAGES).map(([key, v]) => ({ value: key as LanguageCode, label: v.name }))}
+        onSelect={(v) => updateSetting("language", v)}
+        onClose={() => setShowLangPicker(false)}
+      />
+    </SafeScreen>
   );
 }
-
-function ModalCard({ children, colors }: any) {
-  return (
-    <View style={styles.modalOverlay}>
-      <View style={[styles.modalCard, { backgroundColor: colors.card }]}>
-        {children}
-      </View>
-    </View>
-  );
-}
-
-function ModalItem({ label, onPress, colors }: any) {
-  return (
-    <TouchableOpacity style={styles.modalItem} onPress={onPress}>
-      <Text style={{ color: colors.text, fontSize: 16 }}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
-
-/* ---------------- STYLES ---------------- */
 
 const styles = StyleSheet.create({
-  title: {
-    fontSize: 26,
-    fontWeight: "700",
-    marginVertical: 16,
-  },
-  section: {
-    borderRadius: 16,
-    marginBottom: 20,
-    overflow: "hidden",
-  },
-  sectionTitle: {
-    fontSize: 12,
-    marginLeft: 16,
-    marginTop: 12,
-    marginBottom: 6,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderTopWidth: 1,
-  },
-  logoutBtn: {
-    marginTop: 20,
-    alignItems: "center",
-    paddingVertical: 14,
-  },
-  logoutText: {
-    color: "#EF4444",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.4)",
-    padding: 24,
-  },
-  modalCard: {
-    borderRadius: 16,
-    paddingVertical: 8,
-  },
-  modalItem: {
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-  },
+  scroll: { padding: Space.lg, paddingBottom: 120 },
+  profile: { flexDirection: "row", alignItems: "center", gap: Space.md },
+  profileName: { fontSize: 17, fontWeight: "700" },
+  profileSub: { fontSize: 13, marginTop: 2 },
+  group: { paddingVertical: 2 },
 });

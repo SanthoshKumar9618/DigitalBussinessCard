@@ -1,87 +1,37 @@
-import {
-  View,
-  Text,
-  StyleSheet,
-  Alert,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  Image,
-  Platform,
-} from "react-native";
 import { useState } from "react";
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { updateProfile } from "../../services/profileService";
-import api, { BASE_URL } from "../../services/api";
+import api, { assetUrl } from "../../services/api";
 import { useApp } from "../context/AppContext";
 import SafeScreen from "../ui/Screen1";
 import EditBusinessCard from "../../app/profile/ProfileCard";
-import { sendEmailOtp, verifyEmailOtp, updateUser } from "../../services/userService";
-/* ---------------- TYPES ---------------- */
+import { sendEmailOtp, updateUser, verifyEmailOtp } from "../../services/userService";
+import Button from "../ui/Button";
+import TextField from "../ui/TextField";
+import { Avatar, ListRow, ScreenHeader, SectionLabel, Segmented, Surface } from "../ui/kit";
+import { Space } from "../../constants/design";
 
-type TabType = "info" | "fields";
-type Mode = "profile" | "card";
+type TabType = "info" | "links";
+type IconName = keyof typeof Ionicons.glyphMap;
 
-/* ---------------- OPTIONAL FIELDS ---------------- */
-
-const OPTIONAL_FIELDS = [
-  { key: "website", label: "Website", placeholder: "https://example.com" },
-  { key: "linkedin", label: "LinkedIn", placeholder: "https://linkedin.com/in/..." },
-  { key: "twitter", label: "Twitter", placeholder: "https://twitter.com/..." },
-  { key: "facebook", label: "Facebook", placeholder: "https://facebook.com/..." },
-  { key: "whatsapp", label: "WhatsApp", placeholder: "https://wa.me/..." },
+const OPTIONAL_FIELDS: { key: string; label: string; placeholder: string; icon: IconName }[] = [
+  { key: "website", label: "Website", placeholder: "example.com", icon: "globe-outline" },
+  { key: "linkedin", label: "LinkedIn", placeholder: "linkedin.com/in/your-name", icon: "logo-linkedin" },
+  { key: "twitter", label: "Twitter / X", placeholder: "x.com/your-handle", icon: "logo-twitter" },
+  { key: "facebook", label: "Facebook", placeholder: "facebook.com/your-page", icon: "logo-facebook" },
+  { key: "whatsapp", label: "WhatsApp", placeholder: "+91 98765 43210", icon: "logo-whatsapp" },
 ];
-
-/* ---------------- INPUT ---------------- */
-
-function LabeledInput({
-  label,
-  value,
-  onChangeText,
-  placeholder,
-  multiline = false,
-  colors,
-}: any) {
-  return (
-    <View style={{ marginBottom: 16 }}>
-      <Text style={{ fontSize: 13, fontWeight: "600", color: colors.subText }}>
-        {label}
-      </Text>
-
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={colors.subText}
-        multiline={multiline}
-        style={{
-          paddingVertical: Platform.OS === "ios" ? 14 : 10,
-          paddingHorizontal: 14,
-          borderRadius: 12,
-          borderWidth: 1,
-          borderColor: colors.border,
-          backgroundColor: colors.card,
-          color: colors.text,
-          marginTop: 6,
-          minHeight: multiline ? 90 : undefined,
-          textAlignVertical: multiline ? "top" : "center",
-        }}
-      />
-    </View>
-  );
-}
-
-/* ================== SCREEN ================== */
 
 export default function EditProfile({ profile, onDone }: any) {
   const { colors } = useApp();
 
-  const [mode, setMode] = useState<Mode>("profile");
+  const [mode, setMode] = useState<"profile" | "card">("profile");
   const [activeTab, setActiveTab] = useState<TabType>("info");
   const [isDirty, setIsDirty] = useState(false);
-
-  const [avatar, setAvatar] = useState(profile.avatar_url);
+  const [saving, setSaving] = useState(false);
+  const [avatar, setAvatar] = useState<string | null>(profile.avatar_url);
 
   const [form, setForm] = useState({
     display_name: profile.display_name || "",
@@ -94,421 +44,235 @@ export default function EditProfile({ profile, onDone }: any) {
     facebook: profile.facebook ?? "",
     whatsapp: profile.whatsapp ?? "",
   });
+  const [userForm, setUserForm] = useState({ phone: profile.phone || "", email: profile.email || "" });
 
-  const [userForm, setUserForm] = useState({
-  phone: profile.phone || "",
-  email: profile.email || "",
-});
+  const [emailVerified, setEmailVerified] = useState(profile.email_verified ?? false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [verifying, setVerifying] = useState(false);
 
-const [emailVerified, setEmailVerified] = useState(
-  profile.email_verified ?? false
-);
-const [otpSent, setOtpSent] = useState(false);
-const [otp, setOtp] = useState("");
-const [verifying, setVerifying] = useState(false);
-
-  /* ---------------- IMAGE PICK ---------------- */
+  const set = (k: keyof typeof form) => (v: string) => {
+    setForm((f) => ({ ...f, [k]: v }));
+    setIsDirty(true);
+  };
 
   const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
+    const result = await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.8 });
     if (!result.canceled) {
       setAvatar(result.assets[0].uri);
       setIsDirty(true);
     }
   };
 
-  /* ---------------- SAVE ---------------- */
+  const emailChanged = userForm.email.trim() !== (profile.email || "");
 
   const handleSave = async () => {
-    const payload: any = {};
-
+    // Check before saving anything, so nothing is half-saved.
+    if (emailChanged && !emailVerified) {
+      Alert.alert("Verify your new email", "Tap Verify next to the email and enter the code we send.");
+      return;
+    }
+    const payload: Record<string, string> = {};
     Object.entries(form).forEach(([k, v]) => {
-      if (typeof v === "string" && v.trim()) {
-        payload[k] = v.trim();
-      }
+      if (typeof v === "string" && v.trim()) payload[k] = v.trim();
     });
+    if (payload.website && !payload.website.startsWith("http")) payload.website = "https://" + payload.website;
 
-    if (payload.website && !payload.website.startsWith("http")) {
-      payload.website = "https://" + payload.website;
+    try {
+      setSaving(true);
+      if (Object.keys(payload).length > 0) await updateProfile(payload);
+      if (userForm.phone !== (profile.phone || "")) await updateUser({ phone: userForm.phone });
+
+      if (avatar && avatar !== profile.avatar_url) {
+        const formData = new FormData();
+        if (Platform.OS === "web") {
+          const blob = await (await fetch(avatar)).blob();
+          formData.append("file", blob, "avatar.jpg");
+        } else {
+          formData.append("file", { uri: avatar, name: "avatar.jpg", type: "image/jpeg" } as any);
+        }
+        const res = await api.post("/profile/avatar", formData, { headers: { "Content-Type": "multipart/form-data" } });
+        profile.avatar_url = res.data.avatar_url;
+      }
+      onDone();
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail;
+      Alert.alert("Couldn't save", typeof detail === "string" ? detail : "Please check your connection and try again.");
+    } finally {
+      setSaving(false);
     }
-
-    if (Object.keys(payload).length > 0) {
-      await updateProfile(payload);
-    }
-
-      if (userForm.phone !== profile.phone) {
-    await updateUser({ phone: userForm.phone });
-  }
-
-  if (userForm.email !== profile.email && !emailVerified) {
-    Alert.alert("Please verify your new email");
-    return;
-  }
-
-   if (avatar && avatar !== profile.avatar_url) {
-  const formData = new FormData();
-  formData.append("file", {
-    uri: avatar,
-    name: "avatar.jpg",
-    type: "image/jpeg",
-  } as any);
-
-  const res = await api.post("/profile/avatar", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
-
-  // 🔥 IMPORTANT: update local profile
-  profile.avatar_url = res.data.avatar_url;
-}
-
-
-    onDone();
   };
 
   const handleCancel = () => {
     if (!isDirty) return onDone();
-
+    if (Platform.OS === "web") return onDone();
     Alert.alert("Discard changes?", "Your changes will be lost.", [
-      { text: "Keep Editing", style: "cancel" },
+      { text: "Keep editing", style: "cancel" },
       { text: "Discard", style: "destructive", onPress: onDone },
     ]);
   };
 
-  /* ================== CARD EDIT ================== */
+  const handleSendEmailOtp = async () => {
+    if (!userForm.email.trim()) return Alert.alert("Enter an email first");
+    try {
+      setVerifying(true);
+      await sendEmailOtp(userForm.email.trim());
+      setOtpSent(true);
+    } catch (e: any) {
+      Alert.alert("Couldn't send code", e?.response?.data?.detail || "Try again in a moment.");
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleVerifyEmailOtp = async () => {
+    if (!otp) return;
+    try {
+      setVerifying(true);
+      await verifyEmailOtp(userForm.email.trim(), otp);
+      setEmailVerified(true);
+      setOtpSent(false);
+    } catch {
+      Alert.alert("That code didn't work", "Check it, or send a new one.");
+    } finally {
+      setVerifying(false);
+    }
+  };
 
   if (mode === "card") {
     return <EditBusinessCard profile={profile} onDone={() => setMode("profile")} />;
   }
 
-
-  const handleSendEmailOtp = async () => {
-  if (!userForm.email) {
-    Alert.alert("Email required");
-    return;
-  }
-
-  try {
-    setVerifying(true);
-    await sendEmailOtp(userForm.email);
-    setOtpSent(true);
-    Alert.alert("OTP sent to new email");
-  } catch (e: any) {
-    Alert.alert(e.response?.data?.detail || "Failed to send OTP");
-  } finally {
-    setVerifying(false);
-  }
-};
-
-const handleVerifyEmailOtp = async () => {
-  if (!otp) return;
-
-  try {
-    setVerifying(true);
-    await verifyEmailOtp(userForm.email, otp);
-    setEmailVerified(true);
-    setOtpSent(false);
-    Alert.alert("Email verified");
-  } catch {
-    Alert.alert("Invalid or expired OTP");
-  } finally {
-    setVerifying(false);
-  }
-};
-  /* ================== PROFILE EDIT ================== */
+  const avatarUri = avatar ? (avatar.startsWith("/") ? assetUrl(avatar) : avatar) : null;
 
   return (
     <SafeScreen>
-      {/* HEADER */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleCancel}>
-          <Ionicons name="arrow-back" size={22} color={colors.text} />
-        </TouchableOpacity>
-
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          Edit Profile
-        </Text>
-
-        <TouchableOpacity onPress={handleSave}>
-          <Text style={[styles.headerSave, { color: colors.primary }]}>
-            Save
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* EDIT CARD BUTTON */}
-      <TouchableOpacity
-        style={[
-          styles.editCardBtn,
-          { backgroundColor: colors.card, borderColor: colors.primary },
-        ]}
-        onPress={() => setMode("card")}
-      >
-        <Ionicons name="card-outline" size={18} color={colors.primary} />
-        <Text style={[styles.editCardText, { color: colors.primary }]}>
-          Edit Business Card
-        </Text>
-      </TouchableOpacity>
-
-      {/* TABS */}
-      <View style={[styles.tabs, { backgroundColor: colors.card }]}>
-        {["info", "fields"].map((t) => (
-          <TouchableOpacity
-            key={t}
-            onPress={() => setActiveTab(t as TabType)}
-            style={[
-              styles.tab,
-              activeTab === t && { backgroundColor: colors.primary + "22" },
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <View style={styles.headerWrap}>
+          <ScreenHeader
+            title="Edit profile"
+            back={handleCancel}
+            right={<Button title="Save" size="md" onPress={handleSave} loading={saving} style={{ minWidth: 84 }} />}
+          />
+          <Segmented<TabType>
+            value={activeTab}
+            onChange={setActiveTab}
+            options={[
+              { value: "info", label: "Details" },
+              { value: "links", label: "Links & social" },
             ]}
-          >
-            <Text style={{ color: colors.text }}>{t.toUpperCase()}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+          />
+        </View>
 
-      <ScrollView
-        contentContainerStyle={styles.container}
-        keyboardDismissMode="on-drag"
-      >
-        {/* INFO TAB */}
-        {activeTab === "info" && (
-          <>
-            <Text style={styles.sectionTitle}>Profile Photo</Text>
+        <ScrollView contentContainerStyle={styles.scroll} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
+          {activeTab === "info" ? (
+            <>
+              <Pressable onPress={pickImage} style={styles.avatarWrap} accessibilityRole="button" accessibilityLabel="Change photo">
+                <Avatar uri={avatarUri} name={form.display_name} size={104} />
+                <View style={[styles.camBadge, { backgroundColor: colors.primary, borderColor: colors.bg }]}>
+                  <Ionicons name="camera" size={16} color={colors.onPrimary} />
+                </View>
+              </Pressable>
+              <Text style={[styles.avatarHint, { color: colors.subText }]}>Tap to change photo</Text>
 
-            <TouchableOpacity
-              style={[styles.avatarBox, { backgroundColor: colors.card }]}
-              onPress={pickImage}
-            >
-              {avatar ? (
-                <Image
-                  source={{
-                    uri: avatar.startsWith("http")
-                      ? avatar
-                      : `${BASE_URL}${avatar}`,
-                  }}
-                  style={styles.avatar}
-                />
-              ) : (
-                <Ionicons name="image-outline" size={22} color={colors.subText} />
-              )}
-            </TouchableOpacity>
+              <SectionLabel>About you</SectionLabel>
+              <TextField label="Display name" icon="person-outline" value={form.display_name} onChangeText={set("display_name")} placeholder="Your name" />
+              <TextField label="Job title" icon="briefcase-outline" value={form.job_title} onChangeText={set("job_title")} placeholder="e.g. Product Manager" />
+              <TextField label="Company" icon="business-outline" value={form.company} onChangeText={set("company")} placeholder="Company name" />
+              <TextField label="Bio" value={form.bio} onChangeText={set("bio")} placeholder="One or two lines about what you do" multiline maxLength={280} hint={`${form.bio.length}/280`} />
 
-            <Text style={styles.sectionTitle}>Profile Details</Text>
-
-            <LabeledInput
-              label="Display Name"
-              value={form.display_name}
-              onChangeText={(v: string) => {
-                setForm({ ...form, display_name: v });
-                setIsDirty(true);
-              }}
-              placeholder="Your name"
-              colors={colors}
-            />
-
-            <LabeledInput
-  label="Phone Number"
-  value={userForm.phone}
-  onChangeText={(v: string) => {
-    setUserForm({ ...userForm, phone: v });
-    setIsDirty(true);
-  }}
-  placeholder="+91 98765 43210"
-  colors={colors}
-/>
-
-<View style={{ marginBottom: 16 }}>
-  <Text style={{ fontSize: 13, fontWeight: "600", color: colors.subText }}>
-    Email
-  </Text>
-
-  <View
-    style={{
-      marginTop: 6,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: emailVerified ? "green" : colors.border,
-      backgroundColor: colors.card,
-      paddingHorizontal: 14,
-      paddingVertical: Platform.OS === "ios" ? 14 : 10,
-    }}
-  >
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-      <TextInput
-        value={userForm.email}
-        onChangeText={(v) => {
-          setUserForm({ ...userForm, email: v });
-          setEmailVerified(false);
-          setIsDirty(true);
-        }}
-        keyboardType="email-address"
-        placeholder="email@example.com"
-        placeholderTextColor={colors.subText}
-        style={{ flex: 1, color: colors.text }}
-      />
-
-      {emailVerified ? (
-        <Ionicons name="checkmark-circle" size={20} color="green" />
-      ) : (
-        <TouchableOpacity onPress={handleSendEmailOtp}>
-          <Text style={{ color: colors.primary, fontWeight: "600" }}>
-            Verify
-          </Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  </View>
-</View>
-
-
-{otpSent && !emailVerified && (
-  <View style={{ marginBottom: 16 }}>
-    <Text style={{ fontSize: 13, fontWeight: "600", color: colors.subText }}>
-      Enter OTP
-    </Text>
-
-    <View
-      style={{
-        marginTop: 6,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.card,
-        paddingHorizontal: 14,
-        paddingVertical: Platform.OS === "ios" ? 14 : 10,
-      }}
-    >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-        <TextInput
-          value={otp}
-          onChangeText={setOtp}
-          keyboardType="number-pad"
-          placeholder="6-digit OTP"
-          placeholderTextColor={colors.subText}
-          style={{ flex: 1, color: colors.text }}
-        />
-
-        <TouchableOpacity onPress={handleVerifyEmailOtp}>
-          <Text style={{ color: colors.primary, fontWeight: "600" }}>
-            Submit
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  </View>
-)}
-
-
-            <LabeledInput
-              label="Job Title"
-              value={form.job_title}
-              onChangeText={(v: string) => {
-                setForm({ ...form, job_title: v });
-                setIsDirty(true);
-              }}
-              placeholder="e.g. Product Manager"
-              colors={colors}
-            />
-
-            <LabeledInput
-              label="Company"
-              value={form.company}
-              onChangeText={(v: string) => {
-                setForm({ ...form, company: v });
-                setIsDirty(true);
-              }}
-              placeholder="Company name"
-              colors={colors}
-            />
-
-            <LabeledInput
-              label="Bio"
-              value={form.bio}
-              onChangeText={(v: string) => {
-                setForm({ ...form, bio: v });
-                setIsDirty(true);
-              }}
-              placeholder="Short bio"
-              multiline
-              colors={colors}
-            />
-          </>
-        )}
-
-        {/* FIELDS TAB */}
-        {activeTab === "fields" && (
-          <>
-            <Text style={styles.sectionTitle}>Links & Social</Text>
-
-            {OPTIONAL_FIELDS.map((f) => (
-              <LabeledInput
-                key={f.key}
-                label={f.label}
-                value={(form as any)[f.key]}
-                onChangeText={(v: string) => {
-                  setForm({ ...form, [f.key]: v });
+              <SectionLabel>Contact</SectionLabel>
+              <TextField
+                label="Phone"
+                icon="call-outline"
+                value={userForm.phone}
+                onChangeText={(v) => {
+                  setUserForm((u) => ({ ...u, phone: v }));
                   setIsDirty(true);
                 }}
-                placeholder={f.placeholder}
-                colors={colors}
+                placeholder="+91 98765 43210"
+                keyboardType="phone-pad"
               />
-            ))}
-          </>
-        )}
-      </ScrollView>
+              <TextField
+                label="Email"
+                icon="mail-outline"
+                value={userForm.email}
+                onChangeText={(v) => {
+                  setUserForm((u) => ({ ...u, email: v }));
+                  setEmailVerified(v.trim() === (profile.email || "") ? profile.email_verified ?? false : false);
+                  setIsDirty(true);
+                }}
+                placeholder="you@company.com"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                hint={emailVerified ? "Verified" : emailChanged ? "Verify the new email before saving" : undefined}
+                containerStyle={{ marginBottom: emailChanged && !emailVerified ? 8 : 14 }}
+              />
+              {emailChanged && !emailVerified ? (
+                otpSent ? (
+                  <View style={styles.otpRow}>
+                    <TextField
+                      value={otp}
+                      onChangeText={setOtp}
+                      placeholder="6-digit code"
+                      keyboardType="number-pad"
+                      maxLength={6}
+                      containerStyle={{ flex: 1, marginBottom: 0 }}
+                    />
+                    <Button title="Confirm" size="md" onPress={handleVerifyEmailOtp} loading={verifying} />
+                  </View>
+                ) : (
+                  <Button title="Verify email" icon="shield-checkmark-outline" variant="secondary" size="md" onPress={handleSendEmailOtp} loading={verifying} style={{ marginBottom: 14 }} />
+                )
+              ) : null}
+
+              <SectionLabel>Your card</SectionLabel>
+              <Surface style={{ paddingVertical: 2 }}>
+                <ListRow icon="card-outline" title="Edit business card" subtitle="Layout, colours and what's shown" onPress={() => setMode("card")} last />
+              </Surface>
+            </>
+          ) : (
+            <>
+              <Text style={[styles.linksIntro, { color: colors.subText }]}>
+                These appear as buttons on your card. Leave any blank to hide it.
+              </Text>
+              {OPTIONAL_FIELDS.map((f) => (
+                <TextField
+                  key={f.key}
+                  label={f.label}
+                  icon={f.icon}
+                  value={(form as any)[f.key]}
+                  onChangeText={set(f.key as keyof typeof form)}
+                  placeholder={f.placeholder}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType={f.key === "whatsapp" ? "phone-pad" : "url"}
+                />
+              ))}
+            </>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeScreen>
   );
 }
 
-/* ---------------- STYLES ---------------- */
-
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 16,
-  },
-  headerTitle: { fontSize: 18, fontWeight: "700" },
-  headerSave: { fontSize: 16, fontWeight: "700" },
-
-  tabs: { flexDirection: "row", margin: 16, borderRadius: 14 },
-  tab: { flex: 1, padding: 12, alignItems: "center", borderRadius: 14 },
-
-  container: { padding: 16 },
-
-  sectionTitle: { fontSize: 16, fontWeight: "600", marginVertical: 12 },
-
-  avatarBox: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    alignSelf: "center",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  avatar: { width: 120, height: 120, borderRadius: 60 },
-
-  editCardBtn: {
-    flexDirection: "row",
+  headerWrap: { paddingHorizontal: Space.lg, paddingTop: Space.sm, paddingBottom: Space.md },
+  scroll: { paddingHorizontal: Space.lg, paddingBottom: 120 },
+  avatarWrap: { alignSelf: "center", marginTop: Space.md },
+  camBadge: {
+    position: "absolute",
+    right: 2,
+    bottom: 2,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 3,
     alignItems: "center",
     justifyContent: "center",
-    marginHorizontal: 16,
-    marginBottom: 8,
-    paddingVertical: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 8,
   },
-  editCardText: {
-    fontWeight: "600",
-    fontSize: 15,
-  },
-
-
+  avatarHint: { textAlign: "center", fontSize: 13, marginTop: Space.sm },
+  otpRow: { flexDirection: "row", alignItems: "center", gap: Space.sm, marginBottom: 14 },
+  linksIntro: { fontSize: 14, lineHeight: 20, marginBottom: Space.lg },
 });

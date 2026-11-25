@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image,
   Linking,
   Platform,
   RefreshControl,
@@ -26,6 +25,7 @@ import { deleteLead, exportCsv, getLeads, Lead, leadToContact, markLeadRead, tim
 import { getReminders } from "@/services/aiService";
 import { assetUrl } from "@/services/api";
 import { HIT, Radius, Space, Type } from "@/constants/design";
+import { Avatar, Badge, EmptyState, IconButton, ScreenHeader, Segmented } from "@/components/ui/kit";
 
 type Segment = "contacts" | "leads";
 
@@ -154,13 +154,11 @@ export default function NetworkScreen() {
         accessibilityLabel={`Lead ${item.name}${item.is_read ? "" : ", unread"}`}
         style={[
           styles.card,
-          { backgroundColor: colors.card, borderLeftColor: item.is_read ? "transparent" : colors.primary },
+          { backgroundColor: colors.card, borderColor: colors.border, borderLeftColor: item.is_read ? colors.border : colors.primary },
         ]}
       >
         <View style={styles.row}>
-          <View style={[styles.avatar, { backgroundColor: colors.primarySoft }]}>
-            <Text style={[styles.initials, { color: colors.primary }]}>{initials(item.name)}</Text>
-          </View>
+          <View style={styles.avatarGap}><Avatar name={item.name} size={46} /></View>
           <View style={styles.info}>
             <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
             {!!(item.company || item.email || item.phone) && (
@@ -172,9 +170,7 @@ export default function NetworkScreen() {
           <View style={{ alignItems: "flex-end" }}>
             <Text style={[styles.time, { color: colors.subText }]}>{timeAgo(item.created_at)}</Text>
             {multiCard && !!item.card_label && (
-              <Text style={[styles.badge, { color: colors.primary, backgroundColor: colors.primarySoft, marginTop: 4, marginRight: 0 }]}>
-                {item.card_label}
-              </Text>
+              <View style={{ marginTop: 4 }}><Badge label={item.card_label} /></View>
             )}
           </View>
         </View>
@@ -203,18 +199,12 @@ export default function NetworkScreen() {
     const avatar = assetUrl(item.target_profile?.avatar_url);
     return (
       <TouchableOpacity
-        style={[styles.card, styles.row, { backgroundColor: colors.card }]}
+        style={[styles.card, styles.row, { backgroundColor: colors.card, borderColor: colors.border, borderLeftColor: colors.border }]}
         accessibilityRole="button"
         accessibilityLabel={`Open ${item.saved_display_name}`}
         onPress={() => router.push({ pathname: "/contact/detail", params: { contact: JSON.stringify(item) } })}
       >
-        {avatar ? (
-          <Image source={{ uri: avatar }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, { backgroundColor: colors.primarySoft }]}>
-            <Text style={[styles.initials, { color: colors.primary }]}>{initials(item.saved_display_name)}</Text>
-          </View>
-        )}
+        <View style={styles.avatarGap}><Avatar uri={avatar} name={item.saved_display_name} size={46} /></View>
         <View style={styles.info}>
           <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>{item.saved_display_name}</Text>
           {!!(item.saved_job_title || item.saved_company) && (
@@ -226,8 +216,8 @@ export default function NetworkScreen() {
           )}
           {!!(item.tag || item.source) && (
             <View style={styles.badges}>
-              {!!item.tag && <Text style={[styles.badge, { color: colors.primary, backgroundColor: colors.primarySoft }]}>#{item.tag}</Text>}
-              {!!item.source && <Text style={[styles.badge, { color: colors.subText, backgroundColor: colors.bg }]}>{String(item.source).toUpperCase()}</Text>}
+              {!!item.tag && <Badge label={`#${item.tag}`} />}
+              {!!item.source && <Badge label={String(item.source).toUpperCase()} tone="muted" />}
             </View>
           )}
         </View>
@@ -242,7 +232,7 @@ export default function NetworkScreen() {
   function ActionChip({ icon, label, onPress, danger }: { icon: any; label: string; onPress: () => void; danger?: boolean }) {
     const tint = danger ? colors.danger : colors.primary;
     return (
-      <TouchableOpacity onPress={onPress} style={[styles.chip, { backgroundColor: colors.bg }]} accessibilityLabel={label}>
+      <TouchableOpacity onPress={onPress} style={[styles.chip, { backgroundColor: colors.elevated, borderColor: colors.border }]} accessibilityLabel={label}>
         <Ionicons name={icon} size={16} color={tint} />
         <Text style={[styles.chipText, { color: danger ? colors.danger : colors.text }]}>{label}</Text>
       </TouchableOpacity>
@@ -274,36 +264,23 @@ export default function NetworkScreen() {
       />
     );
 
-  function EmptyState({ icon, title, body, cta, onCta }: { icon: any; title: string; body: string; cta?: string; onCta?: () => void }) {
-    return (
-      <View style={styles.empty}>
-        <View style={[styles.emptyIcon, { backgroundColor: colors.primarySoft }]}>
-          <Ionicons name={icon} size={28} color={colors.primary} />
-        </View>
-        <Text style={[styles.emptyTitle, { color: colors.text }]}>{title}</Text>
-        <Text style={[styles.emptyBody, { color: colors.subText }]}>{body}</Text>
-        {!!cta && (
-          <TouchableOpacity onPress={onCta} style={[styles.primaryBtn, { backgroundColor: colors.primary }]}>
-            <Text style={[styles.primaryBtnText, { color: colors.onPrimary }]}>{cta}</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    );
-  }
 
   return (
     <SafeScreen>
       <View style={styles.container}>
         {/* HEADER */}
-        <View style={styles.header}>
-          <Text style={[Type.title, { color: colors.text }]}>My Network</Text>
-          <View style={styles.headerActions}>
-            <IconBtn icon="card-outline" label="Scan a paper business card" onPress={() => router.push("/scan-card")} color={colors.text} />
-            <IconBtn icon="stats-chart-outline" label="Insights" onPress={() => router.push("/insights")} color={colors.text} />
-            <IconBtn icon="download-outline" label={`Export ${segment} as CSV`} onPress={onExport} color={colors.text} />
-            <IconBtn icon="book-outline" label="Open phone contacts" onPress={openPhoneContacts} color={colors.text} />
-          </View>
-        </View>
+        <ScreenHeader
+          large
+          title="Network"
+          right={
+            <>
+              <IconButton icon="card-outline" label="Scan a paper business card" onPress={() => router.push("/scan-card")} />
+              <IconButton icon="stats-chart-outline" label="Insights" onPress={() => router.push("/insights")} />
+              <IconButton icon="download-outline" label={`Export ${segment} as CSV`} onPress={onExport} />
+              <IconButton icon="book-outline" label="Open phone contacts" onPress={openPhoneContacts} />
+            </>
+          }
+        />
 
         {/* FOLLOW-UPS DUE */}
         {dueIds.size > 0 && (
@@ -324,34 +301,24 @@ export default function NetworkScreen() {
         )}
 
         {/* SEGMENTED CONTROL */}
-        <View style={[styles.segment, { backgroundColor: colors.card }]} accessibilityRole="tablist">
-          {(["contacts", "leads"] as Segment[]).map((s) => {
-            const active = segment === s;
-            const label = s === "contacts" ? `Contacts (${contacts.length})` : `Leads (${leads.length})`;
-            return (
-              <TouchableOpacity
-                key={s}
-                onPress={() => setSegment(s)}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: active }}
-                style={[styles.segmentBtn, active && { backgroundColor: colors.primary }]}
-              >
-                <Text style={[styles.segmentText, { color: active ? colors.onPrimary : colors.text }]}>{label}</Text>
-                {s === "leads" && unread > 0 && (
-                  <View style={[styles.dot, { backgroundColor: active ? colors.onPrimary : colors.primary }]} />
-                )}
-              </TouchableOpacity>
-            );
-          })}
+        <View style={{ marginBottom: Space.md }}>
+          <Segmented<Segment>
+            value={segment}
+            onChange={setSegment}
+            options={[
+              { value: "contacts", label: `Contacts (${contacts.length})` },
+              { value: "leads", label: `Leads (${leads.length})`, dot: unread > 0 },
+            ]}
+          />
         </View>
 
         {segment === "contacts" && (
           <>
-            <View style={[styles.search, { backgroundColor: colors.card }]}>
+            <View style={[styles.search, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Ionicons name="search" size={16} color={colors.subText} />
               <TextInput
                 placeholder="Search name, company, tag…"
-                placeholderTextColor={colors.subText}
+                placeholderTextColor={colors.placeholder}
                 style={[styles.searchInput, { color: colors.text }]}
                 value={search}
                 onChangeText={onSearch}
@@ -373,7 +340,7 @@ export default function NetworkScreen() {
                     <TouchableOpacity
                       key={t ?? "__all"}
                       onPress={() => setTagFilter(t)}
-                      style={[styles.tag, { backgroundColor: active ? colors.primary : colors.card }]}
+                      style={[styles.tag, { backgroundColor: active ? colors.primary : colors.card, borderColor: active ? colors.primary : colors.border }]}
                     >
                       <Text style={[styles.tagText, { color: active ? colors.onPrimary : colors.text }]}>{t ? `#${t}` : "All"}</Text>
                     </TouchableOpacity>
@@ -399,17 +366,7 @@ export default function NetworkScreen() {
   );
 }
 
-function IconBtn({ icon, label, onPress, color }: { icon: any; label: string; onPress: () => void; color: string }) {
-  return (
-    <TouchableOpacity onPress={onPress} style={styles.iconBtn} accessibilityRole="button" accessibilityLabel={label} hitSlop={6}>
-      <Ionicons name={icon} size={20} color={color} />
-    </TouchableOpacity>
-  );
-}
 
-function initials(name?: string | null) {
-  return (name || "?").split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("") || "?";
-}
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: Space.lg },
@@ -423,14 +380,15 @@ const styles = StyleSheet.create({
   segmentText: { fontSize: 14, fontWeight: "600" },
   dot: { width: 8, height: 8, borderRadius: 4, marginLeft: 6 },
 
-  search: { flexDirection: "row", alignItems: "center", borderRadius: Radius.card, paddingHorizontal: Space.md, minHeight: HIT, marginBottom: Space.md },
+  search: { flexDirection: "row", alignItems: "center", borderRadius: Radius.card, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: Space.md, minHeight: 48, marginBottom: Space.md },
   searchInput: { marginLeft: Space.sm, flex: 1, fontSize: 15 },
 
   tags: { flexDirection: "row", flexWrap: "wrap", marginBottom: Space.sm },
-  tag: { paddingHorizontal: Space.md, paddingVertical: 6, borderRadius: Radius.pill, marginRight: Space.sm, marginBottom: Space.sm },
+  tag: { paddingHorizontal: Space.md, paddingVertical: 6, borderRadius: Radius.pill, borderWidth: 1, marginRight: Space.sm, marginBottom: Space.sm },
   tagText: { fontSize: 12, fontWeight: "600" },
 
-  card: { padding: 14, borderRadius: Radius.card, marginBottom: Space.md, borderLeftWidth: 3, borderLeftColor: "transparent" },
+  card: { padding: 14, borderRadius: Radius.card, marginBottom: Space.md, borderWidth: StyleSheet.hairlineWidth, borderLeftWidth: 3 },
+  avatarGap: { marginRight: Space.md },
   row: { flexDirection: "row", alignItems: "center" },
   avatar: { width: 46, height: 46, borderRadius: 23, marginRight: Space.md, alignItems: "center", justifyContent: "center" },
   initials: { fontSize: 16, fontWeight: "700" },
@@ -443,7 +401,7 @@ const styles = StyleSheet.create({
   note: { fontSize: 14, fontStyle: "italic", marginTop: 10, lineHeight: 20 },
 
   actions: { flexDirection: "row", flexWrap: "wrap", marginTop: Space.md },
-  chip: { flexDirection: "row", alignItems: "center", paddingHorizontal: Space.md, minHeight: 36, borderRadius: Radius.pill, marginRight: Space.sm, marginBottom: Space.sm },
+  chip: { flexDirection: "row", alignItems: "center", paddingHorizontal: Space.md, minHeight: 36, borderRadius: Radius.pill, borderWidth: StyleSheet.hairlineWidth, marginRight: Space.sm, marginBottom: Space.sm },
   chipText: { marginLeft: 6, fontSize: 13, fontWeight: "600" },
 
   empty: { alignItems: "center", paddingHorizontal: Space.xl, marginTop: 56 },

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Stack, useRouter } from "expo-router";
 import { listenForReminderTaps } from "../services/reminderNotifications";
 import { View } from "react-native";
+import { StatusBar } from "expo-status-bar";
 import { AuthProvider } from "../context/AuthContext";
 import { CardProvider } from "../context/CardContext";
 import { AppProvider, useApp } from "../components/context/AppContext";
@@ -17,8 +18,13 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 
 function ThemedBackground({ children }: { children: React.ReactNode }) {
-  const { colors } = useApp();
-  return <View style={{ flex: 1, backgroundColor: colors.bg }}>{children}</View>;
+  const { colors, theme } = useApp();
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <StatusBar style={theme === "dark" ? "light" : "dark"} />
+      {children}
+    </View>
+  );
 }
 
 function ReminderTapHandler() {

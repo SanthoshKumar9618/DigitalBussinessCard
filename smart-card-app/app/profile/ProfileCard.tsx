@@ -8,6 +8,10 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { BASE_URL } from "../../services/api";
+import SafeScreen from "@/components/ui/Screen1";
+import Button from "@/components/ui/Button";
+import { Chip, ScreenHeader } from "@/components/ui/kit";
+import { Space } from "@/constants/design";
 import ViewShot, { type ViewShotRef } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 import { useRef } from "react";
@@ -40,69 +44,31 @@ export default function ProfileCardEditor({
   if (!profile) return null;
 
   return (
-    <View style={styles.root}>
-      {/* HEADER */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={onDone}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="arrow-back" size={22} />
-        </TouchableOpacity>
+    <SafeScreen>
+      <View style={styles.root}>
+        <ScreenHeader title="Business card" subtitle="Pick a style, then share it as an image" back={onDone} />
 
-        <Text style={styles.headerTitle}>Digital Card</Text>
-        <View style={{ width: 40 }} />
+        {/* CARD PREVIEW */}
+        <ViewShot ref={cardRef} options={{ format: "png", quality: 1 }}>
+          <View style={styles.preview}>
+            {cardType === "wave" ? (
+              <WaveBusinessCard profile={profile} />
+            ) : (
+              <BusinessCard profile={profile} type={cardType} />
+            )}
+          </View>
+        </ViewShot>
+
+        {/* STYLE PICKER */}
+        <View style={styles.selector}>
+          {(["classic", "soft", "dark", "wave"] as const).map((t) => (
+            <Chip key={t} label={t[0].toUpperCase() + t.slice(1)} active={cardType === t} onPress={() => setCardType(t)} />
+          ))}
+        </View>
+
+        <Button title="Share card image" icon="share-outline" onPress={exportCardAsImage} style={{ marginTop: Space.xl }} />
       </View>
-
-      {/* CARD PREVIEW */}
-      <ViewShot
-  ref={cardRef}
-  options={{ format: "png", quality: 1 }}
->
-  <View style={styles.preview}>
-    {cardType === "wave" ? (
-      <WaveBusinessCard profile={profile} />
-    ) : (
-      <BusinessCard profile={profile} type={cardType} />
-    )}
-  </View>
-</ViewShot>
-
-
-      {/* CARD SELECTOR */}
-      <View style={styles.selector}>
-       {["classic", "soft", "dark", "wave"].map((t) => (
-
-          <TouchableOpacity
-            key={t}
-            onPress={() => setCardType(t as any)}
-            style={[
-              styles.selectorItem,
-              cardType === t && styles.selectorActive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.selectorText,
-                cardType === t && styles.selectorTextActive,
-              ]}
-            >
-              {t.toUpperCase()}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-      {/* SHARE BUTTON */}
-<TouchableOpacity
-  style={styles.shareBtn}
-  onPress={exportCardAsImage}
->
-  <Ionicons name="image-outline" size={18} color="#FFF" />
-  <Text style={styles.shareText}>Share Card</Text>
-</TouchableOpacity>
-
-
-    </View>
+    </SafeScreen>
   );
 }
 
@@ -270,7 +236,6 @@ function getTheme(type: string) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#F9FAFB",
     padding: 16,
   },
 
@@ -286,7 +251,7 @@ const styles = StyleSheet.create({
   },
 
   preview: {
-    marginTop: 40,
+    marginTop: 8,
     alignItems: "center",
   },
 

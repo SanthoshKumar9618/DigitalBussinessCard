@@ -1,6 +1,6 @@
 # SmartCard: Market Research, Roadmap and UI/UX/CX Spec
 
-_Last updated: 2026-11-24_
+_Last updated: 2026-11-25_
 
 ---
 
@@ -156,6 +156,28 @@ Migration `d2a7f5c3e9b1` makes `contacts.target_profile_id` nullable and adds `s
 
 Migration `e8b3c6d1f4a7` adds `users.plan`, `teams`, `team_members`, `webhooks` and `integrations`.
 
+### Phase 5: Trust, privacy and deeper insight (planned)
+
+These gaps came from comparing a market-research review (2026-11-25) with what is built. Most of that review's suggestions were already done in Phases 1–4. These are the ones that weren't, in priority order.
+
+| # | Feature | Why | Notes |
+|---|---|---|---|
+| 5.1 | **Delete my account** and **download my data** (JSON + CSV of profile, cards, contacts, leads) | **Required before a store release**: Google Play requires in-app account deletion for apps that create accounts. GDPR and India's DPDP Act also give users both rights. | There's no route for this today. Delete must cascade to cards, contacts, leads, uploads, webhooks and integrations, and handle team ownership (transfer or delete the team). Ask for the password or an OTP before deleting. |
+| 5.2 | **Two-factor login** (authenticator app, TOTP) | Protects accounts that hold other people's contact data; expected by team admins | `users.two_factor_enabled` and `two_factor_secret` already exist but nothing uses them. Store the secret encrypted (like integration tokens) and add recovery codes. |
+| 5.3 | **Private cards**: an expiry date, a PIN to view, or both | Fits the privacy-first positioning; useful for one-off sharing | Per card. The public page shows a PIN form or an "expired" message. Expired cards keep their stats. |
+| 5.4 | **Richer analytics**: country, device type and UTM campaign on each view | Shows where scans come from and which campaigns work | Today a view stores only `source` (qr, nfc, link or email). Derive the country from the IP at request time and **don't store the raw IP**. Add a "Top countries / devices / campaigns" section to Insights. |
+| 5.5 | **Auto follow-up email** when a lead arrives (optional, off by default) | Reaches leads while they're fresh | Uses the existing email provider. An editable template per card, and the AI draft (3.2) can suggest it. |
+| 5.6 | **Native Salesforce and Pipedrive sync** | Teams on those CRMs today go through Zapier/webhooks | Same pattern as HubSpot (4.5): encrypted token, upsert by email, "sync everything". |
+| 5.7 | **Video intro** on the card (a short clip or a YouTube/Vimeo link) | Makes cards stand out and more personal | A link embed first; uploads later (storage cost). |
+| 5.8 | **Referral links** | Growth: each card is already a distribution channel | "Made with SmartCard — get yours" on public cards, tracked per referrer. Wait until billing exists to give rewards. |
+
+**Deliberately not planned**
+- **AR/VR, NFT or blockchain cards:** high effort, niche demand.
+- **Kafka/RabbitMQ, microservices, serverless or a separate analytics warehouse:** FastAPI + Postgres with background tasks and retried webhooks is enough at this stage. Revisit if queue backlogs or slow Insights queries appear.
+- **SSO (SAML/OIDC) and audit logs:** only when a larger team customer asks for them.
+
+The market figures in that review (market size, growth rate, latency and carbon claims) weren't verified. Check the original sources before using them publicly.
+
 ---
 
 ## 3. UI / UX / CX design
@@ -169,18 +191,23 @@ Migration `e8b3c6d1f4a7` adds `users.plan`, `teams`, `team_members`, `webhooks` 
 
 ### 3.2 Design tokens (`smart-card-app/constants/design.ts`)
 
-| Token | Dark | Light | Use |
+Colours live in `components/context/AppContext.tsx`. **Light is the default** (also before sign-in); Dark only when the user picks it in Settings. Neutrals are warm so they sit with the gold.
+
+| Token | Light (default) | Dark | Use |
 |---|---|---|---|
-| `bg` | `#0B0B0B` | `#FFFFFF` | Screen background |
-| `card` | `#111827` | `#F3F4F6` | Surfaces |
-| `elevated` | `#1A2230` | `#FFFFFF` | Sheets, inputs |
-| `text` | `#FFFFFF` | `#111827` | Primary text |
-| `subText` | `#9CA3AF` | `#6B7280` | Secondary text |
-| `border` | `#1F2937` | `#E5E7EB` | Dividers |
-| `primary` | `#C9A24D` | `#B08A35` | Brand gold, primary CTA |
-| `primarySoft` | `rgba(201,162,77,.14)` | `rgba(176,138,53,.12)` | Chips, highlights |
-| `onPrimary` | `#0B0B0B` | `#FFFFFF` | Text on gold |
-| `success` / `danger` | `#22C55E` / `#EF4444` | `#16A34A` / `#DC2626` | Status |
+| `bg` | `#F6F3EC` (ivory) | `#0B0B0C` | Screen background |
+| `card` | `#FFFFFF` | `#161618` | Surfaces, inputs |
+| `elevated` | `#FBF9F4` | `#1E1E21` | Chips, nested surfaces |
+| `text` | `#1C1917` | `#F5F5F4` | Primary text |
+| `subText` | `#6B6560` | `#A8A29E` | Secondary text |
+| `placeholder` | `#A8A29E` | `#6F6A66` | Input placeholders |
+| `border` | `#E8E2D6` | `#2A2A2D` | Hairline borders, dividers |
+| `primary` | `#94701F` | `#C9A24D` | Brand gold, primary CTA (light gold is darker to pass 4.5:1) |
+| `primarySoft` | `rgba(148,112,31,.12)` | `rgba(201,162,77,.14)` | Icon tiles, highlights |
+| `onPrimary` | `#FFFFFF` | `#0B0B0C` | Text on gold |
+| `success` / `danger` | `#16A34A` / `#DC2626` | `#22C55E` / `#EF4444` | Status |
+
+**Shared components** (use these instead of styling screens by hand): `components/ui/Button.tsx` (primary / secondary / ghost / danger, loading state), `TextField.tsx` (label, icon, error, password toggle), `CodeInput.tsx` (OTP boxes), `AuthLayout.tsx` (sign-in frame), and `kit.tsx`: `ScreenHeader`, `IconButton`, `Surface`, `SectionLabel`, `ListRow`, `Avatar`, `Chip`, `Segmented`, `OptionSheet`, `EmptyState`, `Loading`, `Badge`.
 
 - **Spacing:** 4 · 8 · 12 · 16 · 24 · 32
 - **Radius:** 8 (chips) · 14 (inputs, cards) · 22 (sheets) · 999 (pills)
