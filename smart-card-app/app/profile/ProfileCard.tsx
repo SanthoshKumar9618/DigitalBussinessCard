@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { BASE_URL } from "../../services/api";
-import ViewShot from "react-native-view-shot";
+import ViewShot, { type ViewShotRef } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 import { useRef } from "react";
 
@@ -22,7 +22,7 @@ export default function ProfileCardEditor({
   const [cardType, setCardType] =
   useState<"classic" | "soft" | "dark" | "wave">("soft");
 
-  const cardRef = useRef<ViewShot>(null);
+  const cardRef = useRef<ViewShotRef>(null);
 
    const exportCardAsImage = async () => {
     if (!cardRef.current) return;

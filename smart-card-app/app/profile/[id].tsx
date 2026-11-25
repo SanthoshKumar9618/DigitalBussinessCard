@@ -19,7 +19,7 @@ import {
   saveContact,
   deleteContact,
 } from "../../services/contactService";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 
 

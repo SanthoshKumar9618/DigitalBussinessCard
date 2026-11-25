@@ -57,7 +57,7 @@ export default function TabsLayout() {
         options={{
           title: "Network",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="people-outline" size={size} color={color} />
+            <Ionicons name="people-outline" size={size} color={String(color)} />
           ),
         }}
       />
@@ -67,7 +67,7 @@ export default function TabsLayout() {
         options={{
           title: "Tap",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="radio-outline" size={size} color={color} />
+            <Ionicons name="radio-outline" size={size} color={String(color)} />
           ),
         }}
       />
@@ -77,7 +77,7 @@ export default function TabsLayout() {
         options={{
           title: "Scan",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="qr-code-outline" size={size} color={color} />
+            <Ionicons name="qr-code-outline" size={size} color={String(color)} />
           ),
         }}
       />
@@ -87,7 +87,7 @@ export default function TabsLayout() {
         options={{
           title: "Profile",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
+            <Ionicons name="person-outline" size={size} color={String(color)} />
           ),
         }}
       />
@@ -97,7 +97,7 @@ export default function TabsLayout() {
         options={{
           title: "Settings",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings-outline" size={size} color={color} />
+            <Ionicons name="settings-outline" size={size} color={String(color)} />
           ),
         }}
       />

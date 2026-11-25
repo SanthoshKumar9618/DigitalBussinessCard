@@ -11,7 +11,7 @@ import {
   Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import NfcManager, { NfcTech } from "react-native-nfc-manager";
+import { getNfc, nfcSupportedInThisBuild } from "../../services/nfc";
 import { resolveNfc } from "../../services/nfcService";
 import { saveContact } from "../../services/contactService";
 import QRCode from "react-native-qrcode-svg";
@@ -56,15 +56,29 @@ export default function TapScreen() {
   }, [showQrParam]);
 
   useEffect(() => {
-    NfcManager.start();
+    const nfc = getNfc();
+    if (!nfc) return;
+    nfc.default.start().catch(() => {});
     return () => {
-      NfcManager.cancelTechnologyRequest();
+      nfc.default.cancelTechnologyRequest().catch(() => {});
     };
   }, []);
 
   /* ---------------- NFC ---------------- */
 
   const startNfcScan = async () => {
+    const nfc = getNfc();
+    if (!nfc) {
+      Alert.alert(
+        "NFC needs the full app",
+        nfcSupportedInThisBuild
+          ? "NFC isn't available on this device."
+          : "Tapping NFC cards doesn't work inside Expo Go. Use the QR code, or install the SmartCard development build."
+      );
+      return;
+    }
+    const NfcManager = nfc.default;
+
     if (!settings?.nfc_enabled) {
       Alert.alert(
         "NFC Disabled",
@@ -78,7 +92,7 @@ export default function TapScreen() {
         Alert.alert("Ready", "Hold your phone near the NFC card");
       }
 
-      await NfcManager.requestTechnology(NfcTech.Ndef);
+      await NfcManager.requestTechnology(nfc.NfcTech.Ndef);
 
       const tag = await NfcManager.getTag();
       const uid = tag?.id;
@@ -91,7 +105,7 @@ export default function TapScreen() {
     } catch (err) {
       console.log("NFC Error:", err);
     } finally {
-      NfcManager.cancelTechnologyRequest();
+      NfcManager.cancelTechnologyRequest().catch(() => {});
     }
   };
 
