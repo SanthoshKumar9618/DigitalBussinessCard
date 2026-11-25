@@ -52,12 +52,3 @@ export const updateProfile = async (payload: ProfileUpdatePayload) => {
   const res = await api.put("/profile/", payload);
   return res.data;
 };
-
-
-/**
- * DELETE profile
- */
-export const deleteProfile = async () => {
-  const res = await api.delete("/profile/");
-  return res.data;
-};

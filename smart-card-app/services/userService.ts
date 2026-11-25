@@ -1,9 +1,4 @@
-import api from "./api";
-
- export const getCurrentUser = async () => {
-   const res = await api.get("/auth/me");
-    return res.data; 
-  }; 
+import api from "./api"; 
  export function updateUser(payload: { phone?: string }) { 
   return api.put("/user", payload); 
 } 
