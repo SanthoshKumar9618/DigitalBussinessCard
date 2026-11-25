@@ -20,6 +20,12 @@ export const publicProfileUrl = (
 export const assetUrl = (path?: string | null) =>
   !path ? null : path.startsWith("http") ? path : `${BASE_URL}${path}`;
 
+/** Called when the server rejects our login token (expired, revoked, other server). */
+let onUnauthorized: (() => void) | null = null;
+export const setUnauthorizedHandler = (fn: (() => void) | null) => {
+  onUnauthorized = fn;
+};
+
 const api = axios.create({
   baseURL: BASE_URL,
   timeout: 30000,
@@ -48,8 +54,11 @@ api.interceptors.request.use(async (config) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
-      await AsyncStorage.removeItem("access_token");
+    // A signed-in request was rejected: the saved token is no longer valid.
+    // (A wrong password on the login screen is also a 401, but it carries no token.)
+    if (error.response?.status === 401 && error.config?.headers?.Authorization) {
+      await AsyncStorage.multiRemove(["access_token", "active_card_id"]);
+      onUnauthorized?.();
     }
     // The remembered card was deleted elsewhere: fall back to the primary card.
     if (error.response?.status === 404 && error.response?.data?.detail === "Card not found") {

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { logout as logoutRequest } from "../services/authService";
+import { setUnauthorizedHandler } from "../services/api";
 
 type AuthContextType = {
   token: string | null;
@@ -23,6 +24,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     };
     loadToken();
+  }, []);
+
+  // Expired / invalid token anywhere in the app -> back to login
+  useEffect(() => {
+    setUnauthorizedHandler(() => setToken(null));
+    return () => setUnauthorizedHandler(null);
   }, []);
 
   // ✅ LOGIN

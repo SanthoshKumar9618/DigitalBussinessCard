@@ -16,16 +16,16 @@ export default function Index() {
       return;
     }
 
+    setChecking(true);
     const checkProfile = async () => {
       try {
-        await api.get("/profile/me");
-        setHasProfile(true); // ✅ Existing user
+        // /profile/me returns 200 with id: null when the user has no card yet
+        const res = await api.get("/profile/me");
+        setHasProfile(!!res.data?.id);
       } catch (err: any) {
-        if (err.response?.status === 404) {
-          setHasProfile(false); // ✅ New user
-        } else {
-          console.error(err);
-        }
+        // 401: the API client signs out and this screen redirects to login.
+        // Anything else (offline, server down): let the tabs show their own errors.
+        setHasProfile(err.response?.status === 401 ? null : true);
       } finally {
         setChecking(false);
       }

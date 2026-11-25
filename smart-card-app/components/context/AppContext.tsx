@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import { useAuth } from "../../context/AuthContext";
 import { getSettings, updateSettings } from "../../services/settingsService";
 import { LANGUAGES, LanguageCode, TranslationKey } from "../../constants/i18n";
 
@@ -69,6 +70,7 @@ const AppContext = createContext<AppContextType | null>(null);
 /* ---------------- PROVIDER ---------------- */
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const { token } = useAuth();
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -94,17 +96,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }
 };
 
+  // Load settings for whoever is signed in; clear them on logout.
   useEffect(() => {
-  const load = async () => {
-    try {
-      await refreshSettings();
-    } catch (e) {
-      console.log("Settings not available yet");
+    if (!token) {
+      setSettings(null);
+      setLoading(false);
+      return;
     }
-  };
-
-  load();
-}, []);
+    setLoading(true);
+    refreshSettings().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   const updateSetting = async (key: keyof AppSettings, value: any) => {
     if (!settings) return;
