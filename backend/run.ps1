@@ -15,8 +15,8 @@ if (-not (Test-Path "venv")) {
 
 # Activate virtual environment
 Write-Host "Activating virtual environment..." -ForegroundColor Yellow
-& "venv\Scripts\Activate.ps1"
-if ($LASTEXITCODE -ne 0) {
+& "$PSScriptRoot\venv\Scripts\Activate.ps1"
+if (-not $?) {
     Write-Host "ERROR: Failed to activate virtual environment" -ForegroundColor Red
     Write-Host "You may need to run: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser" -ForegroundColor Yellow
     Read-Host "Press Enter to exit"
@@ -33,10 +33,10 @@ if (-not (Test-Path ".env")) {
 
 # Check if requirements are installed
 Write-Host "Checking dependencies..." -ForegroundColor Yellow
-try {
-    python -c "import fastapi" 2>&1 | Out-Null
+python -c "import fastapi, pydantic_settings" 2>&1 | Out-Null
+if ($LASTEXITCODE -eq 0) {
     Write-Host "Dependencies OK" -ForegroundColor Green
-} catch {
+} else {
     Write-Host "ERROR: Dependencies not installed!" -ForegroundColor Red
     Write-Host "Please run '.\setup.ps1' first" -ForegroundColor Yellow
     Write-Host ""
@@ -53,7 +53,7 @@ Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 Read-Host "`nPress Enter to exit"
 

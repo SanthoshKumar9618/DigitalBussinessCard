@@ -1,0 +1,19 @@
+# Keep secrets, local envs and caches out of the image.
+.env
+.env.*
+!.env.example
+venv/
+.venv/
+.venv311/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.git/
+.vscode/
+uploads/
+tests/
+*.bat
+*.ps1
+*.txt
+!requirements.txt

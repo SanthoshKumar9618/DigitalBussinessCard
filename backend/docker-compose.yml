@@ -1,0 +1,20 @@
+# Local development backend.
+#   Start:  docker compose up --build
+#   Stop:   docker compose down
+# The app reaches it at http://<this PC's Wi-Fi IP>:8000 (see smart-card-app/.env).
+# Own project name so it never mixes with other projects' "backend" containers.
+name: businesscard
+
+services:
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      # Code changes reload without rebuilding; uploads persist on the PC.
+      - ./app:/app/app
+      - ./uploads:/app/uploads
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    restart: unless-stopped
